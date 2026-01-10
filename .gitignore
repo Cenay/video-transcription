@@ -1,0 +1,72 @@
+# Environment variables and API keys
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+credentials/
+
+# API keys and tokens (fallback patterns)
+*_API_KEY*
+*_SECRET*
+*_TOKEN*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Project-specific outputs
+output/
+temp/
+logs/
+*.mp3
+*.mp4
+*.wav
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# Input files (videos should not be committed)
+input/*.mp4
+input/*.mp3
+input/*.wav
+input/*.avi
+input/*.mov
+input/*.mkv
+input/*.webm
+
+# Keep the input directory structure
+!input/.gitkeep
+
+# Generated transcripts (if they contain sensitive content)
+output/*.txt
+output/*.json
+output/*.srt
+output/*.vtt
+temp/*
+
+# Keep directory structure
+!output/.gitkeep
+!temp/.gitkeep
+!logs/.gitkeep
