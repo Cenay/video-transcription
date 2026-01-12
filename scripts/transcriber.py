@@ -2,7 +2,8 @@
 """Transcribe audio using AssemblyAI API with speaker diarization."""
 
 import os
-import assemblyai as aai
+import assemblyai as aai    # Switched from OpenAI Whisper to AssemblyAI
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -210,5 +211,4 @@ if __name__ == "__main__":
         print(f"\nDuration: {result.get('duration', 0) / 60:.1f} minutes")
         print(f"Confidence: {result.get('confidence', 0):.1%}")
         print(f"\n--- Transcript Preview ---\n")
-        print(result.get("text", "")[:1500])
-        
+        print(result.get("text", "")[:1500]) 
