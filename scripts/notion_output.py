@@ -157,58 +157,28 @@ def create_meeting_page(
     # transcript_chunks = list(chunk_text(transcript, 1900))
     
     # toggle_children = []
-    # for chunk in transcript_chunks[:50]:  # Notion has limits on children
-    #     toggle_children.append({
-    #         "type": "paragraph",
-    #         "paragraph": {"rich_text": [{"text": {"content": chunk}}]}
-    #     })
-    
-    # Full Transcript in a toggle (collapsed by default)
+    # Full Transcript section
     blocks.append({
-        "type": "heading_2",
-        "heading_2": {"rich_text": [{"text": {"content": "Full Transcript"}}]}
+        "type": "heading_3",
+        "heading_3": {"rich_text": [{"text": {"content": "Transcript"}}]}
     })
 
-    # Create toggle with transcript - split by speaker turns (blank lines)
+    # Add transcript as paragraphs - split by speaker turns (blank lines)
     speaker_turns = [turn.strip() for turn in transcript.split("\n\n") if turn.strip()]
 
-    toggle_children = []
-    truncated = False
     for turn in speaker_turns:
         # Chunk long turns if needed (Notion 2000 char limit)
         if len(turn) > 1900:
             for chunk in chunk_text(turn, 1900):
-                if len(toggle_children) >= 99:  # Leave room for truncation message
-                    truncated = True
-                    break
-                toggle_children.append({
+                blocks.append({
                     "type": "paragraph",
                     "paragraph": {"rich_text": [{"type": "text", "text": {"content": chunk}}]}
                 })
         else:
-            if len(toggle_children) >= 99:
-                truncated = True
-                break
-            toggle_children.append({
+            blocks.append({
                 "type": "paragraph",
                 "paragraph": {"rich_text": [{"type": "text", "text": {"content": turn}}]}
             })
-        if truncated:
-            break
-
-    if truncated:
-        toggle_children.append({
-            "type": "paragraph",
-            "paragraph": {"rich_text": [{"type": "text", "text": {"content": "[Transcript truncated due to length...]"}}]}
-        })
-    
-    blocks.append({
-        "type": "toggle",
-        "toggle": {
-            "rich_text": [{"text": {"content": "Click to expand full transcript"}}],
-            "children": toggle_children
-        }
-    })
     
     # Append all blocks to the page
     # Notion limits to 100 blocks per request, so batch if needed
