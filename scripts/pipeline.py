@@ -108,18 +108,8 @@ def process_video(
         # Step 2: Transcribe
         print("\n[2/4] Transcribing audio...")
         
-        if needs_chunking(audio_path):
-            print(f"  File exceeds 25MB limit, chunking at silence points...")
-            chunks = chunk_audio_at_silence(audio_path)
-            print(f"  Created {len(chunks)} chunks")
-            transcription = transcribe_chunked_audio(chunks)
-            
-            # Clean up chunk files
-            if not keep_temp:
-                for chunk_path, _ in chunks:
-                    Path(chunk_path).unlink(missing_ok=True)
-        else:
-            transcription = transcribe_audio(audio_path)
+        # AssemblyAI handles large files natively - no chunking needed
+        transcription = transcribe_audio(audio_path)
         
         transcript_text = transcription.get("text", "")
         print(f"  Transcription complete: {len(transcript_text)} characters")
@@ -128,7 +118,8 @@ def process_video(
         result["transcription_metadata"] = {
             "duration": transcription.get("duration"),
             "language": transcription.get("language"),
-            "segment_count": len(transcription.get("segments", []))
+            "utterance_count": len(transcription.get("utterances", [])),
+            "confidence": transcription.get("confidence")
         }
         
         # Step 3: Analyze with Claude
