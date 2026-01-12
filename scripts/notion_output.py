@@ -187,10 +187,15 @@ def create_meeting_page(
                 "paragraph": {"rich_text": [{"type": "text", "text": {"content": turn}}]}
             })
 
-    if len(transcript_chunks) > 50:
+    # if len(transcript_chunks) > 50:
+    #     toggle_children.append({
+    #         "type": "paragraph",
+    #         "paragraph": {"rich_text": [{"text": {"content": "[Transcript truncated due to length...]"}}]}
+    #     })
+    if len(speaker_turns) > 100:
         toggle_children.append({
             "type": "paragraph",
-            "paragraph": {"rich_text": [{"text": {"content": "[Transcript truncated due to length...]"}}]}
+            "paragraph": {"rich_text": [{"type": "text", "text": {"content": "[Transcript truncated due to length...]"}}]}
         })
     
     blocks.append({
