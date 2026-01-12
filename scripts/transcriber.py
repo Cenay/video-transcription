@@ -35,8 +35,11 @@ def transcribe_audio(
     if transcript.status == aai.TranscriptStatus.error:
         raise RuntimeError(f"Transcription failed: {transcript.error}")
     
-    # Build formatted text with speaker labels
-    formatted_text = format_with_speakers(transcript.utterances) if speaker_labels else transcript.text
+    # Build formatted text with speaker labels (interactive prompt)
+    if speaker_labels and transcript.utterances:
+        formatted_text = identify_user_speaker(transcript.utterances)
+    else:
+        formatted_text = transcript.text
     
     result = {
         "text": formatted_text,
@@ -83,6 +86,85 @@ def format_with_speakers(utterances) -> str:
     return "\n".join(lines)
 
 
+def identify_user_speaker(utterances, user_name: str = "Cenay") -> str:
+    """
+    Interactive prompt to identify which speaker is the user.
+    
+    Args:
+        utterances: List of utterance objects from AssemblyAI
+        user_name: Name to replace speaker label with
+        
+    Returns:
+        Formatted transcript with user's name replacing their speaker label
+    """
+    if not utterances:
+        return ""
+    
+    # Find first utterance from each speaker
+    speaker_previews = {}
+    for utterance in utterances:
+        speaker = utterance.speaker
+        if speaker not in speaker_previews:
+            preview = utterance.text.strip()[:80]
+            if len(utterance.text.strip()) > 80:
+                preview += "..."
+            speaker_previews[speaker] = preview
+    
+    # Show previews
+    print("\n  Speaker identification:")
+    print("  " + "-" * 50)
+    for speaker, preview in sorted(speaker_previews.items()):
+        print(f"  Speaker {speaker} first said: \"{preview}\"")
+    print("  " + "-" * 50)
+    
+    # Get user input
+    speakers = sorted(speaker_previews.keys())
+    valid_choices = [s for s in speakers] + ["skip"]
+    prompt = f"  Which speaker are you? [{'/'.join(speakers)}/skip]: "
+    
+    while True:
+        choice = input(prompt).strip().upper()
+        if choice.lower() == "skip":
+            print("  → Keeping original speaker labels")
+            return format_with_speakers(utterances)
+        elif choice in speakers:
+            print(f"  → Replacing Speaker {choice} with {user_name}")
+            return format_with_speakers_named(utterances, choice, user_name)
+        else:
+            print(f"  Invalid choice. Enter {', '.join(speakers)}, or skip.")
+
+
+def format_with_speakers_named(utterances, user_speaker: str, user_name: str) -> str:
+    """
+    Format utterances with user's name replacing their speaker label.
+    """
+    if not utterances:
+        return ""
+    
+    lines = []
+    current_speaker = None
+    
+    for utterance in utterances:
+        speaker = utterance.speaker
+        text = utterance.text.strip()
+        
+        # Replace user's speaker label with their name
+        if speaker == user_speaker:
+            label = user_name
+        else:
+            label = f"Speaker {speaker}"
+        
+        if speaker != current_speaker:
+            if current_speaker is not None:
+                lines.append("")
+            lines.append(f"{label}: {text}")
+            current_speaker = speaker
+        else:
+            lines[-1] += f" {text}"
+    
+    return "\n".join(lines)
+
+
 def estimate_cost(duration_seconds: float) -> float:
     """Estimate transcription cost based on duration."""
     minutes = duration_seconds / 60
@@ -107,3 +189,4 @@ if __name__ == "__main__":
         print(f"Confidence: {result.get('confidence', 0):.1%}")
         print(f"\n--- Transcript Preview ---\n")
         print(result.get("text", "")[:1500])
+        
