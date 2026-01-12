@@ -147,22 +147,46 @@ def create_meeting_page(
         "paragraph": {"rich_text": [{"text": {"content": cost_text}}]}
     })
     
+    # # Full Transcript in a toggle (collapsed by default)
+    # blocks.append({
+    #     "type": "heading_2",
+    #     "heading_2": {"rich_text": [{"text": {"content": "Full Transcript"}}]}
+    # })
+    
+    # # Create toggle with transcript chunks
+    # transcript_chunks = list(chunk_text(transcript, 1900))
+    
+    # toggle_children = []
+    # for chunk in transcript_chunks[:50]:  # Notion has limits on children
+    #     toggle_children.append({
+    #         "type": "paragraph",
+    #         "paragraph": {"rich_text": [{"text": {"content": chunk}}]}
+    #     })
+    
     # Full Transcript in a toggle (collapsed by default)
     blocks.append({
         "type": "heading_2",
         "heading_2": {"rich_text": [{"text": {"content": "Full Transcript"}}]}
     })
-    
-    # Create toggle with transcript chunks
-    transcript_chunks = list(chunk_text(transcript, 1900))
-    
+
+    # Create toggle with transcript - split by speaker turns (blank lines)
+    speaker_turns = [turn.strip() for turn in transcript.split("\n\n") if turn.strip()]
+
     toggle_children = []
-    for chunk in transcript_chunks[:50]:  # Notion has limits on children
-        toggle_children.append({
-            "type": "paragraph",
-            "paragraph": {"rich_text": [{"text": {"content": chunk}}]}
-        })
-    
+    for turn in speaker_turns[:100]:  # Limit to 100 speaker turns
+        # Chunk long turns if needed (Notion 2000 char limit)
+        if len(turn) > 1900:
+            for chunk in chunk_text(turn, 1900):
+                toggle_children.append({
+                    "type": "paragraph",
+                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": chunk}}]}
+                })
+        else:
+            toggle_children.append({
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"type": "text", "text": {"content": turn}}]}
+            })
+
     if len(transcript_chunks) > 50:
         toggle_children.append({
             "type": "paragraph",
