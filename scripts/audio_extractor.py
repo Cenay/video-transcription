@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract and chunk audio from video files for Whisper processing."""
+"""Extract and chunk audio from video files for transcription processing."""
 
 import os
 import subprocess
@@ -10,24 +10,24 @@ from pydub.silence import detect_silence
 
 def extract_audio(video_path: str, output_path: str = None) -> str:
     """
-    Extract audio from video, optimized for Whisper (16kHz mono MP3).
-    
+    Extract audio from video, optimized for transcription (16kHz mono MP3).
+
     Args:
         video_path: Path to input video file
         output_path: Optional output path. If None, creates temp file.
-        
+
     Returns:
         Path to extracted audio file
     """
     video_path = Path(video_path)
-    
+
     if output_path is None:
         output_path = video_path.with_suffix('.mp3')
-    
+
     cmd = [
         'ffmpeg',
         '-i', str(video_path),
-        '-ar', '16000',      # 16kHz sample rate (Whisper's internal rate)
+        '-ar', '16000',      # 16kHz sample rate
         '-ac', '1',          # Mono
         '-b:a', '64k',       # 64kbps bitrate (~28MB per hour)
         '-y',                # Overwrite output
@@ -105,7 +105,7 @@ def get_file_size_mb(file_path: str) -> float:
 
 
 def needs_chunking(audio_path: str, max_size_mb: float = 24.0) -> bool:
-    """Check if audio file exceeds Whisper API limit (25MB, using 24 for safety)."""
+    """Check if audio file exceeds size threshold (AssemblyAI handles large files natively)."""
     return get_file_size_mb(audio_path) > max_size_mb
 
 

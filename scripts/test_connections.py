@@ -7,14 +7,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def test_openai():
-    """Test OpenAI/Whisper connection."""
-    print("Testing OpenAI connection...", end=" ")
+def test_assemblyai():
+    """Test AssemblyAI connection."""
+    print("Testing AssemblyAI connection...", end=" ")
     try:
-        from openai import OpenAI
-        client = OpenAI()
-        # Just verify we can create a client (no actual API call)
-        print("✅ Client initialized")
+        import assemblyai as aai
+        api_key = os.environ.get("ASSEMBLYAI_API_KEY")
+        if not api_key:
+            print("❌ ASSEMBLYAI_API_KEY not set")
+            return False
+        aai.settings.api_key = api_key
+        # Verify key format (starts with valid prefix)
+        if not api_key.startswith(("", )):  # AssemblyAI keys don't have a standard prefix
+            pass  # Skip prefix check
+        print("✅ API key configured")
         return True
     except Exception as e:
         print(f"❌ Failed: {e}")
@@ -96,7 +102,7 @@ if __name__ == "__main__":
     results = {
         "FFmpeg": test_ffmpeg(),
         "Redis": test_redis(),
-        "OpenAI": test_openai(),
+        "AssemblyAI": test_assemblyai(),
         "Anthropic": test_anthropic(),
         "Notion": test_notion(),
     }

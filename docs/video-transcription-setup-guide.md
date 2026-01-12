@@ -9,7 +9,7 @@ Based on your environment, here's what you likely have vs. what needs setup:
 | Python 3.x | ✅ Likely installed | Verify version |
 | FFmpeg | ⚠️ May need install | Check/install via APT |
 | Redis | ⚠️ Likely not installed | Install via APT |
-| OpenAI API Key | ✅ Have (from prior Whisper work) | Verify in environment |
+| AssemblyAI API Key | ⚠️ May need to create | Get from assemblyai.com |
 | Anthropic API Key | ✅ Have | Verify in environment |
 | Notion API Token | ⚠️ May need to create | Create integration |
 | Python packages | ❌ Need install | pip install |
@@ -31,7 +31,7 @@ ffmpeg -version
 redis-server --version
 
 # Check for existing API keys in environment
-echo "OpenAI: ${OPENAI_API_KEY:0:10}..."
+echo "AssemblyAI: ${ASSEMBLYAI_API_KEY:0:10}..."
 echo "Anthropic: ${ANTHROPIC_API_KEY:0:10}..."
 ```
 
@@ -105,9 +105,9 @@ pip install --upgrade pip
 
 ```bash
 # With venv activated:
-pip install openai           # Whisper API
+pip install assemblyai       # AssemblyAI transcription API
 pip install anthropic        # Claude API
-pip install pydub            # Audio chunking
+pip install pydub            # Audio processing
 pip install watchdog         # File monitoring
 pip install rq               # Redis Queue
 pip install redis            # Redis client
@@ -119,7 +119,7 @@ Create a requirements.txt for reproducibility:
 
 ```bash
 cat > requirements.txt << 'EOF'
-openai>=1.0.0
+assemblyai>=0.30.0
 anthropic>=0.18.0
 pydub>=0.25.1
 watchdog>=3.0.0
@@ -138,8 +138,8 @@ Create a `.env` file for your API keys:
 
 ```bash
 cat > .env << 'EOF'
-# OpenAI (for Whisper transcription)
-OPENAI_API_KEY=sk-your-openai-key-here
+# AssemblyAI (for transcription with speaker diarization)
+ASSEMBLYAI_API_KEY=your-assemblyai-key-here
 
 # Anthropic (for Claude analysis)
 ANTHROPIC_API_KEY=sk-ant-your-anthropic-key-here
@@ -210,14 +210,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def test_openai():
-    """Test OpenAI/Whisper connection."""
-    print("Testing OpenAI connection...", end=" ")
+def test_assemblyai():
+    """Test AssemblyAI connection."""
+    print("Testing AssemblyAI connection...", end=" ")
     try:
-        from openai import OpenAI
-        client = OpenAI()
-        # Just verify we can create a client (no actual API call)
-        print("✅ Client initialized")
+        import assemblyai as aai
+        api_key = os.environ.get("ASSEMBLYAI_API_KEY")
+        if not api_key:
+            print("❌ ASSEMBLYAI_API_KEY not set")
+            return False
+        aai.settings.api_key = api_key
+        print("✅ API key configured")
         return True
     except Exception as e:
         print(f"❌ Failed: {e}")
@@ -299,7 +302,7 @@ if __name__ == "__main__":
     results = {
         "FFmpeg": test_ffmpeg(),
         "Redis": test_redis(),
-        "OpenAI": test_openai(),
+        "AssemblyAI": test_assemblyai(),
         "Anthropic": test_anthropic(),
         "Notion": test_notion(),
     }
@@ -343,7 +346,7 @@ python scripts/test_connections.py
 ```bash
 cat > scripts/audio_extractor.py << 'EOF'
 #!/usr/bin/env python3
-"""Extract and chunk audio from video files for Whisper processing."""
+"""Extract and chunk audio from video files for transcription processing."""
 
 import os
 import subprocess
@@ -354,24 +357,24 @@ from pydub.silence import detect_silence
 
 def extract_audio(video_path: str, output_path: str = None) -> str:
     """
-    Extract audio from video, optimized for Whisper (16kHz mono MP3).
-    
+    Extract audio from video, optimized for transcription (16kHz mono MP3).
+
     Args:
         video_path: Path to input video file
         output_path: Optional output path. If None, creates temp file.
-        
+
     Returns:
         Path to extracted audio file
     """
     video_path = Path(video_path)
-    
+
     if output_path is None:
         output_path = video_path.with_suffix('.mp3')
-    
+
     cmd = [
         'ffmpeg',
         '-i', str(video_path),
-        '-ar', '16000',      # 16kHz sample rate (Whisper's internal rate)
+        '-ar', '16000',      # 16kHz sample rate
         '-ac', '1',          # Mono
         '-b:a', '64k',       # 64kbps bitrate (~28MB per hour)
         '-y',                # Overwrite output
@@ -449,7 +452,7 @@ def get_file_size_mb(file_path: str) -> float:
 
 
 def needs_chunking(audio_path: str, max_size_mb: float = 24.0) -> bool:
-    """Check if audio file exceeds Whisper API limit (25MB, using 24 for safety)."""
+    """Check if audio file exceeds size threshold (AssemblyAI handles large files natively)."""
     return get_file_size_mb(audio_path) > max_size_mb
 
 
@@ -472,131 +475,99 @@ EOF
 ```bash
 cat > scripts/transcriber.py << 'EOF'
 #!/usr/bin/env python3
-"""Transcribe audio using OpenAI Whisper API."""
+"""Transcribe audio using AssemblyAI API with speaker diarization."""
 
 import os
-import json
-from pathlib import Path
-from openai import OpenAI
+import assemblyai as aai
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize client
-client = OpenAI()
+# Configure AssemblyAI
+aai.settings.api_key = os.environ.get("ASSEMBLYAI_API_KEY")
 
-# Cost per minute (GPT-4o Mini Transcribe)
-COST_PER_MINUTE = 0.003
+# Cost per minute (AssemblyAI with speaker diarization)
+COST_PER_MINUTE = 0.0062
 
 
 def transcribe_audio(
     audio_path: str,
-    model: str = "whisper-1",
-    response_format: str = "verbose_json",
-    language: str = "en"
+    speaker_labels: bool = True,
+    language_code: str = "en"
 ) -> dict:
     """
-    Transcribe a single audio file using Whisper API.
-    
+    Transcribe an audio file using AssemblyAI.
+
     Args:
-        audio_path: Path to audio file (mp3, m4a, wav, etc.)
-        model: Whisper model to use
-        response_format: Output format (json, text, srt, verbose_json, vtt)
-        language: ISO language code
-        
+        audio_path: Path to audio file
+        speaker_labels: Enable speaker diarization
+        language_code: ISO language code
+
     Returns:
         Transcription result dict with text and metadata
     """
-    with open(audio_path, "rb") as audio_file:
-        response = client.audio.transcriptions.create(
-            model=model,
-            file=audio_file,
-            response_format=response_format,
-            language=language,
-            timestamp_granularities=["word", "segment"] if response_format == "verbose_json" else None
-        )
-    
-    if response_format == "verbose_json":
-        return response.model_dump()
+    config = aai.TranscriptionConfig(
+        speaker_labels=speaker_labels,
+        language_code=language_code,
+        punctuate=True,
+        format_text=True
+    )
+
+    transcriber = aai.Transcriber()
+    transcript = transcriber.transcribe(audio_path, config=config)
+
+    if transcript.status == aai.TranscriptStatus.error:
+        raise RuntimeError(f"Transcription failed: {transcript.error}")
+
+    # Build formatted text with speaker labels
+    if speaker_labels and transcript.utterances:
+        formatted_text = format_with_speakers(transcript.utterances)
     else:
-        return {"text": response}
+        formatted_text = transcript.text
 
-
-def transcribe_chunked_audio(
-    chunks: list[tuple[str, int]],
-    model: str = "whisper-1"
-) -> dict:
-    """
-    Transcribe multiple audio chunks and merge results.
-    
-    Args:
-        chunks: List of (chunk_path, start_offset_ms) tuples
-        model: Whisper model to use
-        
-    Returns:
-        Merged transcription with adjusted timestamps
-    """
-    all_segments = []
-    all_words = []
-    full_text_parts = []
-    total_duration = 0
-    
-    for chunk_path, offset_ms in chunks:
-        print(f"  Transcribing chunk: {Path(chunk_path).name}")
-        
-        result = transcribe_audio(chunk_path, model=model)
-        offset_sec = offset_ms / 1000.0
-        
-        # Adjust segment timestamps
-        if "segments" in result:
-            for segment in result["segments"]:
-                adjusted_segment = segment.copy()
-                adjusted_segment["start"] += offset_sec
-                adjusted_segment["end"] += offset_sec
-                all_segments.append(adjusted_segment)
-        
-        # Adjust word timestamps
-        if "words" in result:
-            for word in result["words"]:
-                adjusted_word = word.copy()
-                adjusted_word["start"] += offset_sec
-                adjusted_word["end"] += offset_sec
-                all_words.append(adjusted_word)
-        
-        full_text_parts.append(result.get("text", ""))
-        
-        if "duration" in result:
-            total_duration = max(total_duration, offset_sec + result["duration"])
-    
-    # Deduplicate overlapping segments (from the 30-second overlap)
-    all_segments = deduplicate_segments(all_segments)
-    
-    return {
-        "text": " ".join(full_text_parts),
-        "segments": all_segments,
-        "words": all_words,
-        "duration": total_duration,
-        "language": "en"
+    result = {
+        "text": formatted_text,
+        "raw_text": transcript.text,
+        "duration": transcript.audio_duration,
+        "language": language_code,
+        "confidence": transcript.confidence,
+        "utterances": []
     }
 
+    if transcript.utterances:
+        for utterance in transcript.utterances:
+            result["utterances"].append({
+                "speaker": utterance.speaker,
+                "text": utterance.text,
+                "start": utterance.start / 1000,
+                "end": utterance.end / 1000,
+                "confidence": utterance.confidence
+            })
 
-def deduplicate_segments(segments: list[dict], tolerance: float = 1.0) -> list[dict]:
-    """Remove duplicate segments from overlapping chunks."""
-    if not segments:
-        return []
-    
-    # Sort by start time
-    segments = sorted(segments, key=lambda x: x["start"])
-    
-    deduped = [segments[0]]
-    for segment in segments[1:]:
-        last = deduped[-1]
-        # If this segment starts before the last one ends (overlap), skip it
-        if segment["start"] < last["end"] - tolerance:
-            continue
-        deduped.append(segment)
-    
-    return deduped
+    return result
+
+
+def format_with_speakers(utterances) -> str:
+    """Format utterances with speaker labels and paragraph breaks."""
+    if not utterances:
+        return ""
+
+    lines = []
+    current_speaker = None
+
+    for utterance in utterances:
+        speaker = utterance.speaker
+        text = utterance.text.strip()
+
+        if speaker != current_speaker:
+            if current_speaker is not None:
+                lines.append("")
+            lines.append(f"Speaker {speaker}: {text}")
+            current_speaker = speaker
+        else:
+            lines[-1] += f" {text}"
+
+    return "\n".join(lines)
 
 
 def estimate_cost(duration_seconds: float) -> float:
@@ -605,12 +576,12 @@ def estimate_cost(duration_seconds: float) -> float:
     return minutes * COST_PER_MINUTE
 
 
-def format_timestamp(seconds: float) -> str:
-    """Format seconds as HH:MM:SS."""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+def transcribe_chunked_audio(chunks: list, model: str = None) -> dict:
+    """AssemblyAI handles large files natively. Kept for compatibility."""
+    if chunks:
+        audio_path = chunks[0][0]
+        return transcribe_audio(audio_path)
+    return {"text": "", "utterances": []}
 
 
 if __name__ == "__main__":
@@ -619,8 +590,10 @@ if __name__ == "__main__":
         audio = sys.argv[1]
         print(f"Transcribing: {audio}")
         result = transcribe_audio(audio)
-        print(f"Text length: {len(result.get('text', ''))} characters")
-        print(f"First 500 chars: {result.get('text', '')[:500]}...")
+        print(f"\nDuration: {result.get('duration', 0) / 60:.1f} minutes")
+        print(f"Confidence: {result.get('confidence', 0):.1%}")
+        print(f"\n--- Transcript Preview ---\n")
+        print(result.get("text", "")[:1500])
 EOF
 ```
 
@@ -1151,19 +1124,9 @@ def process_video(
         
         # Step 2: Transcribe
         print("\n[2/4] Transcribing audio...")
-        
-        if needs_chunking(audio_path):
-            print(f"  File exceeds 25MB limit, chunking at silence points...")
-            chunks = chunk_audio_at_silence(audio_path)
-            print(f"  Created {len(chunks)} chunks")
-            transcription = transcribe_chunked_audio(chunks)
-            
-            # Clean up chunk files
-            if not keep_temp:
-                for chunk_path, _ in chunks:
-                    Path(chunk_path).unlink(missing_ok=True)
-        else:
-            transcription = transcribe_audio(audio_path)
+
+        # AssemblyAI handles large files natively - no chunking needed
+        transcription = transcribe_audio(audio_path)
         
         transcript_text = transcription.get("text", "")
         print(f"  Transcription complete: {len(transcript_text)} characters")
@@ -1172,7 +1135,8 @@ def process_video(
         result["transcription_metadata"] = {
             "duration": transcription.get("duration"),
             "language": transcription.get("language"),
-            "segment_count": len(transcription.get("segments", []))
+            "utterance_count": len(transcription.get("utterances", [])),
+            "confidence": transcription.get("confidence")
         }
         
         # Step 3: Analyze with Claude
@@ -1437,9 +1401,10 @@ sudo systemctl enable redis-server
 - Ensure you shared the database with your integration
 - Check the integration has correct permissions
 
-**OpenAI API error "File too large":**
-- The chunking should handle this automatically
-- If still failing, reduce `max_chunk_duration_ms` in `audio_extractor.py`
+**AssemblyAI transcription error:**
+- Verify ASSEMBLYAI_API_KEY is set correctly
+- AssemblyAI handles large files natively (no chunking needed)
+- Check your account has sufficient credits at assemblyai.com
 
 **Claude JSON parsing error:**
 - Usually means response was cut off
@@ -1451,6 +1416,6 @@ sudo systemctl enable redis-server
 
 | Component | Cost |
 |-----------|------|
-| Whisper (GPT-4o Mini) | $0.36 |
-| Claude Sonnet 4.5 | ~$0.15 |
-| **Total** | **~$0.51** |
+| AssemblyAI (with speaker diarization) | $0.74 |
+| Claude Sonnet 4 | ~$0.15 |
+| **Total** | **~$0.89** |
