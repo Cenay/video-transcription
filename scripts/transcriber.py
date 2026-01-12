@@ -86,20 +86,20 @@ def format_with_speakers(utterances) -> str:
     return "\n".join(lines)
 
 
-def identify_user_speaker(utterances, user_name: str = "Cenay") -> str:
+def identify_speakers(utterances, user_name: str = "Cenay") -> str:
     """
-    Interactive prompt to identify which speaker is the user.
-    
+    Interactive prompt to identify all speakers in the transcript.
+
     Args:
         utterances: List of utterance objects from AssemblyAI
-        user_name: Name to replace speaker label with
-        
+        user_name: Default name for the user
+
     Returns:
-        Formatted transcript with user's name replacing their speaker label
+        Formatted transcript with speaker names replacing labels
     """
     if not utterances:
         return ""
-    
+
     # Find first utterance from each speaker
     speaker_previews = {}
     for utterance in utterances:
@@ -109,51 +109,67 @@ def identify_user_speaker(utterances, user_name: str = "Cenay") -> str:
             if len(utterance.text.strip()) > 80:
                 preview += "..."
             speaker_previews[speaker] = preview
-    
+
+    speakers = sorted(speaker_previews.keys())
+
     # Show previews
     print("\n  Speaker identification:")
     print("  " + "-" * 50)
-    for speaker, preview in sorted(speaker_previews.items()):
-        print(f"  Speaker {speaker} first said: \"{preview}\"")
+    for speaker in speakers:
+        print(f"  Speaker {speaker} first said: \"{speaker_previews[speaker]}\"")
     print("  " + "-" * 50)
-    
-    # Get user input
-    speakers = sorted(speaker_previews.keys())
-    valid_choices = [s for s in speakers] + ["skip"]
+
+    # Ask which speaker is the user
     prompt = f"  Which speaker are you? [{'/'.join(speakers)}/skip]: "
-    
+    speaker_names = {}
+
     while True:
         choice = input(prompt).strip().upper()
         if choice.lower() == "skip":
             print("  → Keeping original speaker labels")
             return format_with_speakers(utterances)
         elif choice in speakers:
-            print(f"  → Replacing Speaker {choice} with {user_name}")
-            return format_with_speakers_named(utterances, choice, user_name)
+            speaker_names[choice] = user_name
+            print(f"  → Speaker {choice} = {user_name}")
+            break
         else:
             print(f"  Invalid choice. Enter {', '.join(speakers)}, or skip.")
 
+    # Ask for names of other speakers
+    other_speakers = [s for s in speakers if s not in speaker_names]
+    for speaker in other_speakers:
+        preview = speaker_previews[speaker][:50] + "..." if len(speaker_previews[speaker]) > 50 else speaker_previews[speaker]
+        name = input(f"  Name for Speaker {speaker} (\"{preview}\") [enter to skip]: ").strip()
+        if name:
+            speaker_names[speaker] = name
+            print(f"  → Speaker {speaker} = {name}")
+        else:
+            print(f"  → Keeping Speaker {speaker}")
 
-def format_with_speakers_named(utterances, user_speaker: str, user_name: str) -> str:
+    return format_with_speaker_names(utterances, speaker_names)
+
+
+def format_with_speaker_names(utterances, speaker_names: dict) -> str:
     """
-    Format utterances with user's name replacing their speaker label.
+    Format utterances with custom names for speakers.
+
+    Args:
+        utterances: List of utterance objects
+        speaker_names: Dict mapping speaker labels to names (e.g., {"A": "Cenay", "B": "John"})
     """
     if not utterances:
         return ""
-    
+
     lines = []
     current_speaker = None
-    
+
     for utterance in utterances:
         speaker = utterance.speaker
         text = utterance.text.strip()
-        
-        # Replace user's speaker label with their name
-        if speaker == user_speaker:
-            label = user_name
-        else:
-            label = f"Speaker {speaker}"
-        
+
+        # Use custom name if provided, otherwise keep Speaker X format
+        label = speaker_names.get(speaker, f"Speaker {speaker}")
+
         if speaker != current_speaker:
             if current_speaker is not None:
                 lines.append("")
@@ -161,8 +177,14 @@ def format_with_speakers_named(utterances, user_speaker: str, user_name: str) ->
             current_speaker = speaker
         else:
             lines[-1] += f" {text}"
-    
+
     return "\n".join(lines)
+
+
+# Keep old function name as alias for compatibility
+def identify_user_speaker(utterances, user_name: str = "Cenay") -> str:
+    """Alias for identify_speakers for backward compatibility."""
+    return identify_speakers(utterances, user_name)
 
 
 def estimate_cost(duration_seconds: float) -> float:
