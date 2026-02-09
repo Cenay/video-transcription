@@ -31,6 +31,9 @@ python scripts/pipeline.py /path/to/video.mp4 --output-json results.json
 # Test all API connections
 python scripts/test_connections.py
 
+# Verify Notion setup
+python scripts/verify_notion_setup.py
+
 # Test individual modules
 python scripts/audio_extractor.py /path/to/video.mp4
 python scripts/transcriber.py /path/to/audio.mp3
@@ -90,3 +93,16 @@ Python: See `requirements.txt` (assemblyai, anthropic, pydub, notion-client, etc
 ## Notion Database Schema
 
 Required properties: Name (title), Date (date), Duration (text), Status (select), Cost (number), Source File (text)
+
+## Notion Setup
+
+**Database:** Transcriptions (ID: `2e39a9bc-da8f-80d4-a29ec248064b1bad`)
+- Original location: https://www.notion.so/cenay/Transcriptions-1-2e39a9bcda8f80d4a29ec248064b1bad
+- Linked view on Client Meetings page (created manually, see NOTION_SETUP_GUIDE.md)
+
+**Important:** The Notion API does not support creating linked database views programmatically. To display the Transcriptions database on the Client Meetings page:
+1. See detailed instructions in `NOTION_SETUP_GUIDE.md`
+2. Use `/linked` command in Notion UI to create the view
+3. Position between "Random Links I Need To Save" and "Fireflies Summary" sections
+
+**Verify setup:** Run `python scripts/verify_notion_setup.py` to confirm configuration

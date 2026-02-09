@@ -11,19 +11,14 @@ import os
 import sys
 import json
 import argparse
+import subprocess
 import tempfile
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
 # Import our modules
-from audio_extractor import (
-    extract_audio, 
-    get_audio_duration, 
-    needs_chunking,
-    chunk_audio_at_silence,
-    get_file_size_mb
-)
+from audio_extractor import extract_audio
 from transcriber import (
     transcribe_audio,
     transcribe_chunked_audio,
@@ -74,25 +69,37 @@ def process_video(
     }
     
     try:
-        # Step 1: Extract audio
+        # Step 1: Extract audio with error tolerance
         print("\n[1/4] Extracting audio...")
-        audio_path = temp_dir / f"{video_path.stem}.mp3"
+        audio_path = temp_dir / f"{video_path.stem}.wav"
         audio_path = extract_audio(str(video_path), str(audio_path))
-        
-        duration_sec = get_audio_duration(audio_path)
+
+        # Get duration from extracted audio
+        probe_cmd = [
+            'ffprobe',
+            '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            str(audio_path)
+        ]
+        probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+        if probe_result.returncode != 0:
+            raise RuntimeError(f"ffprobe failed: {probe_result.stderr}")
+
+        duration_sec = float(probe_result.stdout.strip())
         duration_min = duration_sec / 60
-        file_size_mb = get_file_size_mb(audio_path)
-        
+        file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+
         print(f"  Duration: {duration_min:.1f} minutes")
         print(f"  Audio size: {file_size_mb:.1f} MB")
-        
+
         result["duration_minutes"] = duration_min
-        
+
         # Estimate transcription cost
         transcription_cost = estimate_transcription_cost(duration_sec)
         result["costs"]["transcription"] = transcription_cost
         print(f"  Estimated transcription cost: ${transcription_cost:.4f}")
-        
+
         if dry_run:
             # Estimate analysis cost based on typical transcript length
             # ~150 words per minute of speech, ~4 chars per token
@@ -101,15 +108,13 @@ def process_video(
             analysis_estimate = {"estimated_cost_usd": estimated_chars / 4 * 3 / 1_000_000}
             result["costs"]["analysis"] = analysis_estimate["estimated_cost_usd"]
             result["costs"]["total"] = transcription_cost + analysis_estimate["estimated_cost_usd"]
-            
+
             print(f"\n[DRY RUN] Estimated total cost: ${result['costs']['total']:.4f}")
             return result
-        
-        # Step 2: Transcribe
+
+        # Step 2: Transcribe audio
         print("\n[2/4] Transcribing audio...")
-        
-        # AssemblyAI handles large files natively - no chunking needed
-        transcription = transcribe_audio(audio_path)
+        transcription = transcribe_audio(str(audio_path))
         
         transcript_text = transcription.get("text", "")
         print(f"  Transcription complete: {len(transcript_text)} characters")
@@ -165,11 +170,7 @@ def process_video(
         
         result["notion_url"] = notion_url
         print(f"  Created: {notion_url}")
-        
-        # Cleanup
-        if not keep_temp:
-            Path(audio_path).unlink(missing_ok=True)
-        
+
         # Summary
         print(f"\n{'='*60}")
         print("Processing Complete!")
