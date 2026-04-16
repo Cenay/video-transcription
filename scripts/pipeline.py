@@ -36,16 +36,18 @@ load_dotenv()
 def process_video(
     video_path: str,
     dry_run: bool = False,
-    keep_temp: bool = False
+    keep_temp: bool = False,
+    from_cache: bool = False
 ) -> dict:
     """
     Process a video file through the complete pipeline.
-    
+
     Args:
         video_path: Path to MP4 video
         dry_run: If True, estimate costs without processing
         keep_temp: If True, don't delete temporary files
-        
+        from_cache: If True, skip transcription and use cached transcript
+
     Returns:
         Result dict with transcript, analysis, and metadata
     """
@@ -69,63 +71,110 @@ def process_video(
     }
     
     try:
-        # Step 1: Extract audio with error tolerance
-        print("\n[1/4] Extracting audio...")
-        audio_path = temp_dir / f"{video_path.stem}.wav"
-        audio_path = extract_audio(str(video_path), str(audio_path))
+        if from_cache:
+            # Load cached transcript — skip audio extraction and transcription
+            cache_dir = Path(os.environ.get("TEMP_DIR", tempfile.gettempdir())) / "transcribe-cache"
+            cache_file = cache_dir / f"{video_path.stem}-raw-transcript.json"
 
-        # Get duration from extracted audio
-        probe_cmd = [
-            'ffprobe',
-            '-v', 'error',
-            '-show_entries', 'format=duration',
-            '-of', 'default=noprint_wrappers=1:nokey=1',
-            str(audio_path)
-        ]
-        probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
-        if probe_result.returncode != 0:
-            raise RuntimeError(f"ffprobe failed: {probe_result.stderr}")
+            if not cache_file.exists():
+                raise FileNotFoundError(f"No cached transcript found: {cache_file}")
 
-        duration_sec = float(probe_result.stdout.strip())
-        duration_min = duration_sec / 60
-        file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+            print("\n[1/4] Skipping audio extraction (using cache)")
+            print(f"\n[2/4] Loading cached transcript: {cache_file}")
 
-        print(f"  Duration: {duration_min:.1f} minutes")
-        print(f"  Audio size: {file_size_mb:.1f} MB")
+            cache_data = json.loads(cache_file.read_text())
+            duration_sec = cache_data.get("duration", 0)
+            duration_min = duration_sec / 60
 
-        result["duration_minutes"] = duration_min
+            print(f"  Duration: {duration_min:.1f} minutes")
 
-        # Estimate transcription cost
-        transcription_cost = estimate_transcription_cost(duration_sec)
-        result["costs"]["transcription"] = transcription_cost
-        print(f"  Estimated transcription cost: ${transcription_cost:.4f}")
+            result["duration_minutes"] = duration_min
+            result["costs"]["transcription"] = 0  # Already paid for
 
-        if dry_run:
-            # Estimate analysis cost based on typical transcript length
-            # ~150 words per minute of speech, ~4 chars per token
-            estimated_words = int(duration_min * 150)
-            estimated_chars = estimated_words * 5
-            analysis_estimate = {"estimated_cost_usd": estimated_chars / 4 * 3 / 1_000_000}
-            result["costs"]["analysis"] = analysis_estimate["estimated_cost_usd"]
-            result["costs"]["total"] = transcription_cost + analysis_estimate["estimated_cost_usd"]
+            # Re-run speaker identification on cached utterances
+            from transcriber import identify_speakers, format_with_speakers
 
-            print(f"\n[DRY RUN] Estimated total cost: ${result['costs']['total']:.4f}")
-            return result
+            class FakeUtterance:
+                def __init__(self, d):
+                    self.speaker = d["speaker"]
+                    self.text = d["text"]
+                    self.start = d.get("start", 0)
+                    self.end = d.get("end", 0)
 
-        # Step 2: Transcribe audio
-        print("\n[2/4] Transcribing audio...")
-        transcription = transcribe_audio(str(audio_path))
-        
-        transcript_text = transcription.get("text", "")
-        print(f"  Transcription complete: {len(transcript_text)} characters")
-        
-        result["transcript"] = transcript_text
-        result["transcription_metadata"] = {
-            "duration": transcription.get("duration"),
-            "language": transcription.get("language"),
-            "utterance_count": len(transcription.get("utterances", [])),
-            "confidence": transcription.get("confidence")
-        }
+            utterances = [FakeUtterance(u) for u in cache_data.get("utterances", [])]
+
+            if utterances:
+                transcript_text = identify_speakers(utterances)
+            else:
+                transcript_text = cache_data.get("raw_text", "")
+
+            print(f"  Transcript loaded: {len(transcript_text)} characters")
+
+            result["transcript"] = transcript_text
+            result["transcription_metadata"] = {
+                "duration": duration_sec,
+                "language": "en",
+                "utterance_count": len(utterances),
+                "confidence": None
+            }
+        else:
+            # Step 1: Extract audio with error tolerance
+            print("\n[1/4] Extracting audio...")
+            audio_path = temp_dir / f"{video_path.stem}.wav"
+            audio_path = extract_audio(str(video_path), str(audio_path))
+
+            # Get duration from extracted audio
+            probe_cmd = [
+                'ffprobe',
+                '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                str(audio_path)
+            ]
+            probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+            if probe_result.returncode != 0:
+                raise RuntimeError(f"ffprobe failed: {probe_result.stderr}")
+
+            duration_sec = float(probe_result.stdout.strip())
+            duration_min = duration_sec / 60
+            file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+
+            print(f"  Duration: {duration_min:.1f} minutes")
+            print(f"  Audio size: {file_size_mb:.1f} MB")
+
+            result["duration_minutes"] = duration_min
+
+            # Estimate transcription cost
+            transcription_cost = estimate_transcription_cost(duration_sec)
+            result["costs"]["transcription"] = transcription_cost
+            print(f"  Estimated transcription cost: ${transcription_cost:.4f}")
+
+            if dry_run:
+                # Estimate analysis cost based on typical transcript length
+                # ~150 words per minute of speech, ~4 chars per token
+                estimated_words = int(duration_min * 150)
+                estimated_chars = estimated_words * 5
+                analysis_estimate = {"estimated_cost_usd": estimated_chars / 4 * 3 / 1_000_000}
+                result["costs"]["analysis"] = analysis_estimate["estimated_cost_usd"]
+                result["costs"]["total"] = transcription_cost + analysis_estimate["estimated_cost_usd"]
+
+                print(f"\n[DRY RUN] Estimated total cost: ${result['costs']['total']:.4f}")
+                return result
+
+            # Step 2: Transcribe audio
+            print("\n[2/4] Transcribing audio...")
+            transcription = transcribe_audio(str(audio_path))
+
+            transcript_text = transcription.get("text", "")
+            print(f"  Transcription complete: {len(transcript_text)} characters")
+
+            result["transcript"] = transcript_text
+            result["transcription_metadata"] = {
+                "duration": transcription.get("duration"),
+                "language": transcription.get("language"),
+                "utterance_count": len(transcription.get("utterances", [])),
+                "confidence": transcription.get("confidence")
+            }
         
         # Step 3: Analyze with Claude
         print("\n[3/4] Analyzing transcript with Claude...")
@@ -155,10 +204,16 @@ def process_video(
         print("\n[4/4] Creating Notion page...")
         
         # Generate title from filename or use summary
-        title = video_path.stem.replace("-", " ").replace("_", " ").title()
+        # Known acronyms that should stay uppercase
+        UPPERCASE_WORDS = {"trfa", "trfaapi", "fdd", "crm", "api", "ac", "lsp", "psi"}
+        raw_title = video_path.stem.replace("-", " ").replace("_", " ").title()
+        title = " ".join(
+            word.upper() if word.lower() in UPPERCASE_WORDS else word
+            for word in raw_title.split()
+        )
         date = datetime.now().strftime("%Y-%m-%d")
         
-        notion_url = create_meeting_page(
+        notion_result = create_meeting_page(
             title=title,
             date=date,
             duration_minutes=duration_min,
@@ -167,8 +222,10 @@ def process_video(
             costs=result["costs"],
             source_file=video_path.name
         )
-        
+
+        notion_url = notion_result["url"]
         result["notion_url"] = notion_url
+        result["notion_page_id"] = notion_result["page_id"]
         print(f"  Created: {notion_url}")
 
         # Summary
@@ -198,15 +255,18 @@ def main():
                        help="Estimate costs without processing")
     parser.add_argument("--keep-temp", action="store_true",
                        help="Keep temporary audio files")
+    parser.add_argument("--from-cache", action="store_true",
+                       help="Skip transcription, use cached transcript from previous run")
     parser.add_argument("--output-json", type=str,
                        help="Save full result to JSON file")
-    
+
     args = parser.parse_args()
-    
+
     result = process_video(
         args.video,
         dry_run=args.dry_run,
-        keep_temp=args.keep_temp
+        keep_temp=args.keep_temp,
+        from_cache=args.from_cache
     )
     
     if args.output_json:

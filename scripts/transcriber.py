@@ -2,6 +2,8 @@
 """Transcribe audio using AssemblyAI API with speaker diarization."""
 
 import os
+import json
+from pathlib import Path
 import assemblyai as aai    # Switched from OpenAI Whisper to AssemblyAI
 
 from dotenv import load_dotenv
@@ -35,7 +37,36 @@ def transcribe_audio(
     
     if transcript.status == aai.TranscriptStatus.error:
         raise RuntimeError(f"Transcription failed: {transcript.error}")
-    
+
+    # Save raw transcript immediately to prevent data loss
+    cache_dir = Path(os.environ.get("TEMP_DIR", "/tmp")) / "transcribe-cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    audio_stem = Path(audio_path).stem
+    cache_file = cache_dir / f"{audio_stem}-raw-transcript.json"
+
+    raw_utterances = []
+    if transcript.utterances:
+        raw_utterances = [
+            {"speaker": u.speaker, "text": u.text.strip(), "start": u.start, "end": u.end}
+            for u in transcript.utterances
+        ]
+    cache_data = {
+        "raw_text": transcript.text,
+        "utterances": raw_utterances,
+        "duration": transcript.audio_duration,
+        "audio_path": audio_path
+    }
+    cache_file.write_text(json.dumps(cache_data, indent=2))
+    print(f"  Raw transcript cached: {cache_file}")
+
+    # Warn if transcript is empty or very short
+    if not transcript.text or len(transcript.text.strip()) < 50:
+        print(f"\n  WARNING: Transcript is empty or very short ({len(transcript.text.strip()) if transcript.text else 0} chars)")
+        print(f"  The audio may be silent or too quiet to detect speech.")
+        choice = input("  Continue anyway? [y/N]: ").strip().lower()
+        if choice != 'y':
+            raise RuntimeError("Transcription returned empty — aborted by user")
+
     # Build formatted text with speaker labels (interactive prompt)
     if speaker_labels and transcript.utterances:
         formatted_text = identify_user_speaker(transcript.utterances)

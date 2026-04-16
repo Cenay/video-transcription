@@ -19,13 +19,29 @@ ANALYSIS_PROMPT = """Analyze this meeting transcript and extract structured info
 
 Return your analysis as JSON with this exact structure:
 {{
+  "overview": [
+    "Concise bullet point summarizing a key topic or outcome",
+    "Another bullet point covering a different aspect of the meeting",
+    "Continue with additional high-level points as needed (typically 4-8 bullets)"
+  ],
   "summary": "2-3 paragraph executive summary of what was discussed and decided",
+  "notes": [
+    {{
+      "emoji": "📧",
+      "title": "Short descriptive title for this topic section",
+      "bullets": [
+        "Key point or detail discussed in this topic",
+        "Another relevant detail or outcome",
+        "Additional context as needed"
+      ]
+    }}
+  ],
+  "keywords": ["Keyword1", "Keyword2", "Keyword3"],
   "action_items": [
     {{
       "task": "Description of the task",
       "owner": "Person responsible (or 'Unassigned' if unclear)",
-      "deadline": "Due date if mentioned (or 'TBD')",
-      "context": "Brief context for why this task exists"
+      "deadline": "Due date if mentioned (or 'TBD')"
     }}
   ],
   "decisions": [
@@ -39,12 +55,9 @@ Return your analysis as JSON with this exact structure:
     {{
       "quote": "The exact quote",
       "speaker": "Who said it (if identifiable)",
-      "timestamp": "Approximate time in transcript",
       "significance": "Why this quote matters"
     }}
   ],
-  "topics_discussed": ["Topic 1", "Topic 2"],
-  "follow_up_items": ["Items needing follow-up discussion"],
   "meeting_metadata": {{
     "apparent_purpose": "What the meeting was about",
     "tone": "General tone (collaborative, tense, brainstorming, etc.)",
@@ -53,6 +66,11 @@ Return your analysis as JSON with this exact structure:
 }}
 
 Guidelines:
+- Overview bullets should be concise, high-level takeaways (one line each)
+- Notes sections should break the meeting into logical topic segments (typically 5-12 sections)
+- Pick a contextually appropriate emoji for each notes section title
+- Keywords should be useful for searching/finding this meeting later (typically 4-8 keywords)
+- Group action items by owner — include all action items for each person
 - Look for commitments: "I'll do X", "will review Y", "let's plan to Z"
 - Capture explicit decisions: "we agreed", "approved", "decided to"
 - Pull quotes that represent key insights or turning points

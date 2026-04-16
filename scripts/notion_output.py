@@ -55,42 +55,127 @@ def create_meeting_page(
     
     # Build content blocks
     blocks = []
-    
-    # Summary section
+
+    # Metadata header
+    blocks.append({
+        "type": "paragraph",
+        "paragraph": {"rich_text": [
+            {"type": "text", "text": {"content": "🕒 Date: "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": date}}
+        ]}
+    })
+    blocks.append({
+        "type": "paragraph",
+        "paragraph": {"rich_text": [
+            {"type": "text", "text": {"content": "🔗 Meeting Link: "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "[Add link after upload]"}}
+        ]}
+    })
+    blocks.append({
+        "type": "paragraph",
+        "paragraph": {"rich_text": [
+            {"type": "text", "text": {"content": "⌛ Duration: "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": f"{duration_minutes:.0f} minutes"}}
+        ]}
+    })
+    blocks.append({
+        "type": "divider",
+        "divider": {}
+    })
+
+    # Overview section (concise bullets)
+    overview_items = analysis.get("overview", [])
+    if overview_items:
+        blocks.append({
+            "type": "heading_3",
+            "heading_3": {"rich_text": [{"text": {"content": "Overview"}}]}
+        })
+        for item in overview_items:
+            blocks.append({
+                "type": "bulleted_list_item",
+                "bulleted_list_item": {"rich_text": [{"text": {"content": item}}]}
+            })
+
+    # Summary section (paragraph narrative)
     blocks.append({
         "type": "heading_2",
         "heading_2": {"rich_text": [{"text": {"content": "Summary"}}]}
     })
-    
+
     summary = analysis.get("summary", "No summary available.")
-    # Split summary into chunks (Notion has 2000 char limit per block)
     for chunk in chunk_text(summary, 1900):
         blocks.append({
             "type": "paragraph",
             "paragraph": {"rich_text": [{"text": {"content": chunk}}]}
         })
-    
-    # Action Items section
+
+    # Notes section (topical segments with emoji headers)
+    notes = analysis.get("notes", [])
+    if notes:
+        blocks.append({
+            "type": "heading_3",
+            "heading_3": {"rich_text": [{"text": {"content": "Notes"}}]}
+        })
+        for note in notes:
+            emoji = note.get("emoji", "📌")
+            title = note.get("title", "")
+            blocks.append({
+                "type": "paragraph",
+                "paragraph": {"rich_text": [
+                    {"type": "text", "text": {"content": f"{emoji} {title}"}, "annotations": {"bold": True}}
+                ]}
+            })
+            for bullet in note.get("bullets", []):
+                blocks.append({
+                    "type": "bulleted_list_item",
+                    "bulleted_list_item": {"rich_text": [{"text": {"content": bullet}}]}
+                })
+
+    # Keywords section
+    keywords = analysis.get("keywords", [])
+    if keywords:
+        blocks.append({
+            "type": "heading_3",
+            "heading_3": {"rich_text": [{"text": {"content": "Keywords"}}]}
+        })
+        blocks.append({
+            "type": "paragraph",
+            "paragraph": {"rich_text": [{"text": {"content": ", ".join(keywords)}}]}
+        })
+
+    # Action Items section (grouped by person)
     action_items = analysis.get("action_items", [])
     if action_items:
         blocks.append({
-            "type": "heading_2",
-            "heading_2": {"rich_text": [{"text": {"content": "Action Items"}}]}
+            "type": "heading_3",
+            "heading_3": {"rich_text": [{"text": {"content": "Action Items"}}]}
         })
-        
+
+        # Group by owner
+        owners = {}
         for item in action_items:
-            task = item.get("task", "")
             owner = item.get("owner", "Unassigned")
-            deadline = item.get("deadline", "TBD")
-            
+            owners.setdefault(owner, []).append(item)
+
+        for owner, items in owners.items():
             blocks.append({
-                "type": "to_do",
-                "to_do": {
-                    "rich_text": [{"text": {"content": f"{task} (@{owner}, due: {deadline})"}}],
-                    "checked": False
-                }
+                "type": "paragraph",
+                "paragraph": {"rich_text": [
+                    {"type": "text", "text": {"content": f"👤 {owner}"}, "annotations": {"bold": True}}
+                ]}
             })
-    
+            for item in items:
+                task = item.get("task", "")
+                deadline = item.get("deadline", "TBD")
+                task_text = f"{task} (due: {deadline})" if deadline and deadline != "TBD" else task
+                blocks.append({
+                    "type": "to_do",
+                    "to_do": {
+                        "rich_text": [{"text": {"content": task_text}}],
+                        "checked": False
+                    }
+                })
+
     # Decisions section
     decisions = analysis.get("decisions", [])
     if decisions:
@@ -98,11 +183,11 @@ def create_meeting_page(
             "type": "heading_2",
             "heading_2": {"rich_text": [{"text": {"content": "Key Decisions"}}]}
         })
-        
+
         for i, decision in enumerate(decisions, 1):
             decision_text = decision.get("decision", "")
             rationale = decision.get("rationale", "")
-            
+
             blocks.append({
                 "type": "numbered_list_item",
                 "numbered_list_item": {
@@ -112,7 +197,7 @@ def create_meeting_page(
                     ]
                 }
             })
-    
+
     # Key Quotes section
     quotes = analysis.get("key_quotes", [])
     if quotes:
@@ -120,54 +205,42 @@ def create_meeting_page(
             "type": "heading_2",
             "heading_2": {"rich_text": [{"text": {"content": "Key Quotes"}}]}
         })
-        
-        for quote in quotes[:5]:  # Limit to 5 quotes
+
+        for quote in quotes[:5]:
             quote_text = quote.get("quote", "")
             speaker = quote.get("speaker", "Unknown")
-            
-        blocks.append({
-            "type": "quote",
-            "quote": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": f'"{quote_text}"'}},
-                    {"type": "text", "text": {"content": f" — {speaker}"}, "annotations": {"italic": True}}
-                ]
-            }
-        })
-    
+
+            blocks.append({
+                "type": "quote",
+                "quote": {
+                    "rich_text": [
+                        {"type": "text", "text": {"content": f'"{quote_text}"'}},
+                        {"type": "text", "text": {"content": f" — {speaker}"}, "annotations": {"italic": True}}
+                    ]
+                }
+            })
+
     # Processing Costs section
     blocks.append({
         "type": "heading_2",
         "heading_2": {"rich_text": [{"text": {"content": "Processing Details"}}]}
     })
-    
+
     cost_text = f"Transcription: ${costs.get('transcription', 0):.4f} | Analysis: ${costs.get('analysis', 0):.4f} | Total: ${costs.get('total', 0):.4f}"
     blocks.append({
         "type": "paragraph",
         "paragraph": {"rich_text": [{"text": {"content": cost_text}}]}
     })
-    
-    # # Full Transcript in a toggle (collapsed by default)
-    # blocks.append({
-    #     "type": "heading_2",
-    #     "heading_2": {"rich_text": [{"text": {"content": "Full Transcript"}}]}
-    # })
-    
-    # # Create toggle with transcript chunks
-    # transcript_chunks = list(chunk_text(transcript, 1900))
-    
-    # toggle_children = []
+
     # Full Transcript section
     blocks.append({
         "type": "heading_3",
         "heading_3": {"rich_text": [{"text": {"content": "Transcript"}}]}
     })
 
-    # Add transcript as paragraphs - split by speaker turns (blank lines)
     speaker_turns = [turn.strip() for turn in transcript.split("\n\n") if turn.strip()]
 
     for turn in speaker_turns:
-        # Chunk long turns if needed (Notion 2000 char limit)
         if len(turn) > 1900:
             for chunk in chunk_text(turn, 1900):
                 blocks.append({
@@ -186,8 +259,32 @@ def create_meeting_page(
         batch = blocks[i:i+100]
         notion.blocks.children.append(page_id, children=batch)
     
-    # Return the page URL
-    return f"https://notion.so/{page_id.replace('-', '')}"
+    # Return the page URL and page ID
+    page_url = f"https://notion.so/{page_id.replace('-', '')}"
+    return {"url": page_url, "page_id": page_id}
+
+
+def update_meeting_link(page_id: str, meeting_url: str) -> None:
+    """Update the Meeting Link block on a Notion page with the S3 URL."""
+    # Find and update the Meeting Link placeholder in the page blocks
+    blocks = notion.blocks.children.list(page_id)
+    for block in blocks["results"]:
+        if block["type"] == "paragraph":
+            rich_text = block["paragraph"].get("rich_text", [])
+            # Find the block that contains "Meeting Link"
+            full_text = "".join(rt.get("plain_text", "") for rt in rich_text)
+            if "Meeting Link" in full_text:
+                notion.blocks.update(
+                    block["id"],
+                    paragraph={
+                        "rich_text": [
+                            {"type": "text", "text": {"content": "🔗 Meeting Link: "}, "annotations": {"bold": True}},
+                            {"type": "text", "text": {"content": "View meeting", "link": {"url": meeting_url}}}
+                        ]
+                    }
+                )
+                return
+    print("  Warning: Meeting Link block not found on page")
 
 
 def chunk_text(text: str, max_length: int = 1900) -> list[str]:

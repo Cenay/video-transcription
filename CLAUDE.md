@@ -5,38 +5,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Video transcription pipeline that processes MP4 files through:
-1. Audio extraction (FFmpeg → 16kHz mono MP3)
+1. Audio extraction (FFmpeg → 16kHz mono WAV)
 2. Transcription (AssemblyAI with speaker diarization)
-3. Analysis (Claude API extracts summaries, action items, decisions, quotes)
-4. Output (Notion page with structured meeting notes)
+3. Analysis (Claude API extracts overview, notes, keywords, action items, decisions, quotes)
+4. Output (Notion page in Fireflies-style format)
+5. S3 upload with prefix-based routing + Notion link update
+6. Local cleanup (safe delete via gio trash)
 
 ## Commands
 
 ```bash
-# Activate environment
-source venv/bin/activate
-
-# Process a video (full pipeline)
-python scripts/pipeline.py /path/to/video.mp4
+# Full pipeline (transcribe + analyze + Notion + S3 upload + cleanup)
+transcribe-this /path/to/video.mp4
 
 # Estimate costs without processing
-python scripts/pipeline.py /path/to/video.mp4 --dry-run
+transcribe-this /path/to/video.mp4 --dry-run
 
-# Keep temp files for debugging
-python scripts/pipeline.py /path/to/video.mp4 --keep-temp
+# Re-run from cached transcript (no transcription cost)
+transcribe-this /path/to/video.mp4 --from-cache
 
-# Save metadata to JSON
-python scripts/pipeline.py /path/to/video.mp4 --output-json results.json
+# Right-click: Nautilus > Scripts > "Transcribe This" (opens terminal)
 
-# Test all API connections
+# Direct pipeline (no S3/cleanup)
+source venv/bin/activate
+python scripts/pipeline.py /path/to/video.mp4
+python scripts/pipeline.py /path/to/video.mp4 --from-cache
+
+# Test connections
 python scripts/test_connections.py
-
-# Verify Notion setup
 python scripts/verify_notion_setup.py
-
-# Test individual modules
-python scripts/audio_extractor.py /path/to/video.mp4
-python scripts/transcriber.py /path/to/audio.mp3
 ```
 
 ## Architecture
@@ -67,14 +64,25 @@ scripts/
 - 30-second overlap between chunks for context continuity
 
 **Analysis (analyzer.py):**
-- Prompt requests JSON with: summary, action_items, decisions, key_quotes, topics_discussed, follow_up_items, meeting_metadata
+- Prompt requests JSON with: overview (bullets), summary (narrative), notes (topical sections with emojis), keywords, action_items (grouped by owner), decisions, key_quotes, meeting_metadata
 - Handles markdown code blocks in response
 - Tracks token usage for cost reporting
 
 **Notion output (notion_output.py):**
+- Fireflies-style format: metadata header → overview → summary → notes → keywords → action items (by person) → decisions → quotes → costs → transcript
+- `update_meeting_link()` updates the page with S3 URL after upload
 - Splits transcript by speaker turns (blank lines) not arbitrary character counts
 - 2000-char block limit, 100 blocks per API request
-- Full transcript in collapsible toggle
+
+**Transcript caching (transcriber.py):**
+- Raw transcript + utterances saved to `TEMP_DIR/transcribe-cache/` immediately after AssemblyAI returns
+- Enables `--from-cache` re-runs without re-transcription cost
+- Warns user if transcript is empty/very short
+
+**S3 upload (transcribe-this.sh):**
+- Prefix-based routing: `trfa-` → TRFA/, `trfaapi-` → cn-team-videos/TRFA API/, else → root
+- Verifies upload via `aws s3 ls` before cleanup
+- Safe delete via `gio trash` (fallback: mv to .archived/)
 
 ## Environment Variables
 
