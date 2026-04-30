@@ -80,7 +80,8 @@ scripts/
 - Warns user if transcript is empty/very short
 
 **S3 upload (transcribe-this.sh):**
-- Prefix-based routing: `trfa-` → TRFA/, `trfaapi-` → cn-team-videos/TRFA API/, else → root
+- Prefix-based routing: `trfa-` → s3://cn-client-meetings/TRFA/, `trfaapi-` → s3://cn-team-videos/TRFA API/, else → s3://cn-client-meetings/ root
+- Guard rail: script aborts if upload would create a new S3 prefix not in KNOWN_PREFIXES
 - Verifies upload via `aws s3 ls` before cleanup
 - Safe delete via `gio trash` (fallback: mv to .archived/)
 

@@ -33,7 +33,9 @@ EXTRA_ARGS="$@"
 
 # Determine S3 destination based on filename prefix
 if [[ "$FILE_NAME" == trfaapi-* ]]; then
-    S3_PATH="cn-team-videos/TRFA API/$FILE_NAME"
+    S3_BUCKET="cn-team-videos"
+    S3_BASE_URL="https://cn-team-videos.s3.amazonaws.com"
+    S3_PATH="TRFA API/$FILE_NAME"
 elif [[ "$FILE_NAME" == trfa-* ]]; then
     S3_PATH="TRFA/$FILE_NAME"
 else
@@ -42,6 +44,26 @@ fi
 
 S3_URL="$S3_BASE_URL/$S3_PATH"
 S3_DEST="s3://$S3_BUCKET/$S3_PATH"
+
+# Guard: if S3 upload would create a new prefix, warn and abort.
+# Known prefixes per bucket — add new ones here if needed.
+S3_PREFIX="${S3_PATH%%/*}"
+case "$S3_BUCKET" in
+    cn-client-meetings) KNOWN_PREFIXES="TRFA" ;;
+    cn-team-videos)     KNOWN_PREFIXES="TRFA API" ;;
+    *)                  KNOWN_PREFIXES="" ;;
+esac
+# Files in bucket root have no prefix (PREFIX == filename), which is allowed
+if [[ "$S3_PREFIX" != "$FILE_NAME" && ! " $KNOWN_PREFIXES " =~ " $S3_PREFIX " ]]; then
+    echo ""
+    echo "ERROR: Upload would create a NEW S3 folder '$S3_PREFIX' in bucket '$S3_BUCKET'."
+    echo "  Full destination: $S3_DEST"
+    echo "  Known prefixes for this bucket: $KNOWN_PREFIXES"
+    echo ""
+    echo "If this is intentional, add '$S3_PREFIX' to KNOWN_PREFIXES in transcribe-this.sh"
+    echo "Aborting. No files were uploaded."
+    exit 1
+fi
 
 echo "============================================================"
 echo "Transcribe This - Full Pipeline"

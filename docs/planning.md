@@ -11,7 +11,7 @@ A terminal opens and runs all steps sequentially:
 3. **Notion** — Creates page in Fireflies-style format with meeting link placeholder
 4. **S3 Upload** — Uploads MP4 based on filename prefix routing:
    - `trfa-*` → `s3://cn-client-meetings/TRFA/`
-   - `trfaapi-*` → `s3://cn-client-meetings/cn-team-videos/TRFA API/`
+   - `trfaapi-*` → `s3://cn-team-videos/TRFA API/`
    - Everything else → `s3://cn-client-meetings/`
 5. **Notion Update** — Replaces meeting link placeholder with S3 URL
 6. **S3 Verify** — Confirms file exists in S3 via `aws s3 ls`
