@@ -28,16 +28,26 @@ A terminal opens and runs all steps sequentially:
 
 ### CLI Usage
 ```bash
-transcribe-this /path/to/file.mp4              # Full pipeline
-transcribe-this /path/to/file.mp4 --dry-run    # Estimate costs only
-transcribe-this /path/to/file.mp4 --from-cache # Skip transcription, use cached
+transcribe-this /path/to/file.mp4                 # Full pipeline
+transcribe-this /path/to/file.mp4 --dry-run       # Estimate costs only
+transcribe-this /path/to/file.mp4 --from-cache    # Skip transcription, use cached
+transcribe-this /path/to/file.mp4 --transcribe-only # Transcribe only, no analysis/Notion/S3
+transcribe-this /path/to/file.mp4 --no-cleanup    # Keep local folder (alias: --keep)
 ```
+
+**`--no-cleanup` (added 2026-06-04):** Skips Step 4 entirely so the local folder is
+not trashed. Use for multi-segment meetings where several files share one folder —
+processing segment 1 would otherwise trash segments 2 and 3. Run the last segment
+*without* the flag to clean up when done. The flag is parsed out in the shell script
+and stripped before args reach `pipeline.py` (argparse would reject it).
 
 ### Right-Click Setup
 - File manager: Nautilus (GNOME Files)
-- Script: `~/.local/share/nautilus/scripts/Transcribe This`
-- Opens `gnome-terminal` for interactive speaker identification
+- Scripts (both open `gnome-terminal` for interactive speaker ID):
+  - `~/.local/share/nautilus/scripts/Transcribe This` — full pipeline incl. cleanup
+  - `~/.local/share/nautilus/scripts/Transcribe This --no-cleanup` — keeps local folder
 - Supports: mp4, m4a, webm, mkv, wav, mp3
+- Note: new scripts only appear after the scripts folder is re-scanned (reopen the Files window)
 
 ---
 
@@ -45,3 +55,5 @@ transcribe-this /path/to/file.mp4 --from-cache # Skip transcription, use cached
 
 - [ ] TRFA dual-Notion routing — Art's Teamspace needs its own Notion integration (separate workspace, separate API key). Currently all pages go to Cenay's Notion.
 - [ ] ExpanDrive doesn't refresh Nautilus view after `aws s3 cp` uploads — cosmetic issue, files are confirmed in S3
+
+> **Quality-of-life backlog:** smaller polish items live in [`todos/qol-improvements.md`](../todos/qol-improvements.md).

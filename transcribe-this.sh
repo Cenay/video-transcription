@@ -5,6 +5,8 @@
 # Usage: transcribe-this /path/to/file.mp4
 #        transcribe-this /path/to/file.mp4 --dry-run
 #        transcribe-this /path/to/file.mp4 --from-cache
+#        transcribe-this /path/to/file.mp4 --transcribe-only
+#        transcribe-this /path/to/file.mp4 --no-cleanup   (keep the local folder; use for multi-segment meetings)
 
 PIPELINE_DIR="/mnt/k/Code/TRFA/video-transcription"
 S3_BUCKET="cn-client-meetings"
@@ -15,6 +17,8 @@ if [ -z "$1" ]; then
     echo "Usage: transcribe-this /path/to/file.mp4"
     echo "       transcribe-this /path/to/file.mp4 --dry-run"
     echo "       transcribe-this /path/to/file.mp4 --from-cache"
+    echo "       transcribe-this /path/to/file.mp4 --transcribe-only"
+    echo "       transcribe-this /path/to/file.mp4 --no-cleanup   (keep local folder; for multi-segment meetings)"
     exit 1
 fi
 
@@ -29,7 +33,23 @@ FILE_PATH="$(realpath "$1")"
 FILE_NAME="$(basename "$FILE_PATH")"
 FILE_DIR="$(dirname "$FILE_PATH")"
 shift
-EXTRA_ARGS="$@"
+
+# Parse our own flags out of the args before passing the rest to pipeline.py
+# (--no-cleanup / --keep are shell-script concerns; pipeline.py would reject them).
+KEEP_FOLDER=0
+EXTRA_ARGS=""
+for arg in "$@"; do
+    case "$arg" in
+        --no-cleanup|--keep)
+            KEEP_FOLDER=1
+            ;;
+        *)
+            EXTRA_ARGS="$EXTRA_ARGS $arg"
+            ;;
+    esac
+done
+# Trim leading space
+EXTRA_ARGS="${EXTRA_ARGS# }"
 
 # Determine S3 destination based on filename prefix
 if [[ "$FILE_NAME" == trfaapi-* ]]; then
@@ -78,6 +98,15 @@ if [[ "$EXTRA_ARGS" == *"--dry-run"* ]]; then
     echo ""
     echo "[DRY RUN] Would upload to: $S3_DEST"
     echo "[DRY RUN] Meeting link would be: $S3_URL"
+    echo ""
+    cd "$PIPELINE_DIR" && source venv/bin/activate && python scripts/pipeline.py "$FILE_PATH" $EXTRA_ARGS
+    exit $?
+fi
+
+# Check for transcribe-only (skip S3, Notion update, and cleanup)
+if [[ "$EXTRA_ARGS" == *"--transcribe-only"* ]]; then
+    echo ""
+    echo "[TRANSCRIBE ONLY] Skipping S3 upload, Notion update, and cleanup."
     echo ""
     cd "$PIPELINE_DIR" && source venv/bin/activate && python scripts/pipeline.py "$FILE_PATH" $EXTRA_ARGS
     exit $?
@@ -157,31 +186,37 @@ fi
 echo ""
 echo "[Step 4/4] Verifying S3 upload before cleanup..."
 
-# Verify the file actually exists in S3 before touching local files
-S3_CHECK=$(aws s3 ls "$S3_DEST" 2>&1)
-if [ -z "$S3_CHECK" ]; then
-    echo "  ERROR: File NOT found in S3! Local files preserved."
-    echo "  Expected: $S3_DEST"
-    notify-send -u critical "Transcribe This" "S3 verification failed! Local files kept." 2>/dev/null
+# Skip cleanup entirely if --no-cleanup/--keep was passed (e.g. multi-segment meeting)
+if [ "$KEEP_FOLDER" -eq 1 ]; then
+    echo "  --no-cleanup set: leaving local folder untouched (no trash, no archive)."
+    echo "  Folder: $FILE_DIR"
 else
-    echo "  Verified in S3: $S3_CHECK"
-
-    ZOOM_DIR="$HOME/Videos/Zoom"
-    if [[ "$FILE_DIR" == "$ZOOM_DIR"/* && "$FILE_DIR" != "$ZOOM_DIR" ]]; then
-        echo "  Moving Zoom folder to trash: $FILE_DIR"
-        gio trash "$FILE_DIR" 2>/dev/null
-        if [ $? -ne 0 ]; then
-            # Fallback: move to archived folder if gio trash fails
-            ARCHIVE_DIR="$HOME/Videos/Zoom/.archived/$(date +%Y-%m-%d)"
-            mkdir -p "$ARCHIVE_DIR"
-            mv "$FILE_DIR" "$ARCHIVE_DIR/"
-            echo "  Moved to: $ARCHIVE_DIR/$(basename "$FILE_DIR")"
-        else
-            echo "  Moved to trash. Recoverable from trash can."
-        fi
+    # Verify the file actually exists in S3 before touching local files
+    S3_CHECK=$(aws s3 ls "$S3_DEST" 2>&1)
+    if [ -z "$S3_CHECK" ]; then
+        echo "  ERROR: File NOT found in S3! Local files preserved."
+        echo "  Expected: $S3_DEST"
+        notify-send -u critical "Transcribe This" "S3 verification failed! Local files kept." 2>/dev/null
     else
-        echo "  File is not in a Zoom recording folder. Skipping cleanup."
-        echo "  File location: $FILE_DIR"
+        echo "  Verified in S3: $S3_CHECK"
+
+        ZOOM_DIR="$HOME/Videos/Zoom"
+        if [[ "$FILE_DIR" == "$ZOOM_DIR"/* && "$FILE_DIR" != "$ZOOM_DIR" ]]; then
+            echo "  Moving Zoom folder to trash: $FILE_DIR"
+            gio trash "$FILE_DIR" 2>/dev/null
+            if [ $? -ne 0 ]; then
+                # Fallback: move to archived folder if gio trash fails
+                ARCHIVE_DIR="$HOME/Videos/Zoom/.archived/$(date +%Y-%m-%d)"
+                mkdir -p "$ARCHIVE_DIR"
+                mv "$FILE_DIR" "$ARCHIVE_DIR/"
+                echo "  Moved to: $ARCHIVE_DIR/$(basename "$FILE_DIR")"
+            else
+                echo "  Moved to trash. Recoverable from trash can."
+            fi
+        else
+            echo "  File is not in a Zoom recording folder. Skipping cleanup."
+            echo "  File location: $FILE_DIR"
+        fi
     fi
 fi
 

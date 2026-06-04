@@ -37,7 +37,8 @@ def process_video(
     video_path: str,
     dry_run: bool = False,
     keep_temp: bool = False,
-    from_cache: bool = False
+    from_cache: bool = False,
+    transcribe_only: bool = False
 ) -> dict:
     """
     Process a video file through the complete pipeline.
@@ -47,6 +48,7 @@ def process_video(
         dry_run: If True, estimate costs without processing
         keep_temp: If True, don't delete temporary files
         from_cache: If True, skip transcription and use cached transcript
+        transcribe_only: If True, stop after transcription (no analysis or Notion)
 
     Returns:
         Result dict with transcript, analysis, and metadata
@@ -176,6 +178,26 @@ def process_video(
                 "confidence": transcription.get("confidence")
             }
         
+        # Transcribe-only mode: save transcript and stop
+        if transcribe_only:
+            output_dir = Path(__file__).parent.parent / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_file = output_dir / f"{video_path.stem}-transcript.txt"
+            output_file.write_text(transcript_text)
+
+            result["costs"]["total"] = result["costs"].get("transcription", 0)
+            result["output_file"] = str(output_file)
+
+            print(f"\n{'='*60}")
+            print("Transcription Complete (transcribe-only mode)")
+            print(f"{'='*60}")
+            print(f"  Duration: {duration_min:.1f} minutes")
+            print(f"  Total cost: ${result['costs']['total']:.4f}")
+            print(f"  Saved to: {output_file}")
+            print(f"  Characters: {len(transcript_text)}")
+
+            return result
+
         # Step 3: Analyze with Claude
         print("\n[3/4] Analyzing transcript with Claude...")
         
@@ -257,6 +279,8 @@ def main():
                        help="Keep temporary audio files")
     parser.add_argument("--from-cache", action="store_true",
                        help="Skip transcription, use cached transcript from previous run")
+    parser.add_argument("--transcribe-only", action="store_true",
+                       help="Stop after transcription (no analysis or Notion page)")
     parser.add_argument("--output-json", type=str,
                        help="Save full result to JSON file")
 
@@ -266,7 +290,8 @@ def main():
         args.video,
         dry_run=args.dry_run,
         keep_temp=args.keep_temp,
-        from_cache=args.from_cache
+        from_cache=args.from_cache,
+        transcribe_only=args.transcribe_only
     )
     
     if args.output_json:
