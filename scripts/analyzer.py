@@ -51,13 +51,6 @@ Return your analysis as JSON with this exact structure:
       "participants": "Who was involved in the decision"
     }}
   ],
-  "key_quotes": [
-    {{
-      "quote": "The exact quote",
-      "speaker": "Who said it (if identifiable)",
-      "significance": "Why this quote matters"
-    }}
-  ],
   "meeting_metadata": {{
     "apparent_purpose": "What the meeting was about",
     "tone": "General tone (collaborative, tense, brainstorming, etc.)",
@@ -73,7 +66,6 @@ Guidelines:
 - Group action items by owner — include all action items for each person
 - Look for commitments: "I'll do X", "will review Y", "let's plan to Z"
 - Capture explicit decisions: "we agreed", "approved", "decided to"
-- Pull quotes that represent key insights or turning points
 - If speaker names aren't clear, use "Speaker" or describe by role if apparent
 - Mark uncertain items with (unclear) or (approximate)
 

@@ -9,35 +9,21 @@ to the **Open** list as they come up; move them to **Done** with a date when shi
 
 ## Open
 
-### 1. Remove the "Quotes" section
-The Key Quotes section is unneeded — drop it from the Notion output.
-
-- **Where:** `scripts/notion_output.py` ~lines 201–227 (the `key_quotes` / "Key Quotes"
-  heading + `quote` blocks). Also remove the `key_quotes` sample in the `__main__` test
-  block (~lines 319–321).
-- **Also consider:** stop asking Claude for quotes at all — drop `key_quotes` from the
-  prompt/JSON schema in `scripts/analyzer.py` so we don't pay tokens to generate data we
-  throw away. (Safe to leave the key in the response and just ignore it if simpler.)
-- **Effort:** small.
-
-### 2. Put the transcript inside a collapsible Heading 3 toggle
-The full transcript should live inside a **Heading 3 toggle** so it's hidden by default
-and can be expanded only when needed.
-
-- **Where:** `scripts/notion_output.py` ~lines 235–264 (currently a plain `heading_3`
-  "Transcript" followed by paragraph blocks for each speaker turn).
-- **How (Notion API):** make the heading a toggle by setting
-  `heading_3.is_toggleable = true`, and nest the transcript blocks as `children` of that
-  heading block instead of appending them as siblings.
-- **Watch out for:**
-  - The 100-blocks-per-request and 2000-char-per-block limits still apply. Long
-    transcripts may exceed 100 children on a single toggle — may need to append children
-    in batches via a follow-up `blocks.children.append` call targeting the heading block.
-  - Verify nesting depth limits aren't hit (toggle → children paragraphs is fine).
-- **Effort:** medium (the batching for long transcripts is the tricky part).
+_(nothing open)_
 
 ---
 
 ## Done
 
-_(nothing yet)_
+### 1. Remove the "Quotes" section — _2026-06-08_
+Dropped the Key Quotes section from the Notion output (`notion_output.py`) and the
+`key_quotes` sample in the `__main__` test block. Also removed `key_quotes` from the
+prompt/JSON schema and the "Pull quotes" guideline in `analyzer.py` so we no longer pay
+tokens to generate quotes we throw away.
+
+### 2. Put the transcript inside a collapsible Heading 3 toggle — _2026-06-08_
+Transcript now lives in a Heading 3 toggle (`is_toggleable = true`), hidden by default.
+Implementation in `notion_output.py`: non-transcript blocks append to the page first,
+then the toggle heading is created and its id captured, then the transcript paragraphs
+are appended as `children` of that heading in 100-block batches (handles long
+transcripts that exceed a single request).

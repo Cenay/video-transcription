@@ -198,28 +198,6 @@ def create_meeting_page(
                 }
             })
 
-    # Key Quotes section
-    quotes = analysis.get("key_quotes", [])
-    if quotes:
-        blocks.append({
-            "type": "heading_2",
-            "heading_2": {"rich_text": [{"text": {"content": "Key Quotes"}}]}
-        })
-
-        for quote in quotes[:5]:
-            quote_text = quote.get("quote", "")
-            speaker = quote.get("speaker", "Unknown")
-
-            blocks.append({
-                "type": "quote",
-                "quote": {
-                    "rich_text": [
-                        {"type": "text", "text": {"content": f'"{quote_text}"'}},
-                        {"type": "text", "text": {"content": f" — {speaker}"}, "annotations": {"italic": True}}
-                    ]
-                }
-            })
-
     # Processing Costs section
     blocks.append({
         "type": "heading_2",
@@ -232,33 +210,43 @@ def create_meeting_page(
         "paragraph": {"rich_text": [{"text": {"content": cost_text}}]}
     })
 
-    # Full Transcript section
-    blocks.append({
-        "type": "heading_3",
-        "heading_3": {"rich_text": [{"text": {"content": "Transcript"}}]}
-    })
-
+    # Build the full transcript as paragraph blocks (nested inside a toggle below)
     speaker_turns = [turn.strip() for turn in transcript.split("\n\n") if turn.strip()]
-
+    transcript_blocks = []
     for turn in speaker_turns:
         if len(turn) > 1900:
             for chunk in chunk_text(turn, 1900):
-                blocks.append({
+                transcript_blocks.append({
                     "type": "paragraph",
                     "paragraph": {"rich_text": [{"type": "text", "text": {"content": chunk}}]}
                 })
         else:
-            blocks.append({
+            transcript_blocks.append({
                 "type": "paragraph",
                 "paragraph": {"rich_text": [{"type": "text", "text": {"content": turn}}]}
             })
-    
-    # Append all blocks to the page
+
+    # Append all non-transcript blocks to the page
     # Notion limits to 100 blocks per request, so batch if needed
     for i in range(0, len(blocks), 100):
         batch = blocks[i:i+100]
         notion.blocks.children.append(page_id, children=batch)
-    
+
+    # Add the transcript inside a collapsible Heading 3 toggle so it stays
+    # hidden by default. Create the toggle heading first, then nest the
+    # transcript paragraphs as its children (100 per request).
+    toggle_resp = notion.blocks.children.append(page_id, children=[{
+        "type": "heading_3",
+        "heading_3": {
+            "rich_text": [{"text": {"content": "Transcript"}}],
+            "is_toggleable": True
+        }
+    }])
+    toggle_id = toggle_resp["results"][0]["id"]
+    for i in range(0, len(transcript_blocks), 100):
+        batch = transcript_blocks[i:i+100]
+        notion.blocks.children.append(toggle_id, children=batch)
+
     # Return the page URL and page ID
     page_url = f"https://notion.so/{page_id.replace('-', '')}"
     return {"url": page_url, "page_id": page_id}
@@ -315,9 +303,6 @@ if __name__ == "__main__":
         ],
         "decisions": [
             {"decision": "Proceed with plan A", "rationale": "Lower risk"}
-        ],
-        "key_quotes": [
-            {"quote": "Let's make it happen", "speaker": "Sarah"}
         ]
     }
     

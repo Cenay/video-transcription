@@ -71,14 +71,15 @@ scripts/
 - 30-second overlap between chunks for context continuity
 
 **Analysis (analyzer.py):**
-- Prompt requests JSON with: overview (bullets), summary (narrative), notes (topical sections with emojis), keywords, action_items (grouped by owner), decisions, key_quotes, meeting_metadata
+- Prompt requests JSON with: overview (bullets), summary (narrative), notes (topical sections with emojis), keywords, action_items (grouped by owner), decisions, meeting_metadata
 - Handles markdown code blocks in response
 - Tracks token usage for cost reporting
 
 **Notion output (notion_output.py):**
-- Fireflies-style format: metadata header → overview → summary → notes → keywords → action items (by person) → decisions → quotes → costs → transcript
+- Fireflies-style format: metadata header → overview → summary → notes → keywords → action items (by person) → decisions → costs → transcript
 - `update_meeting_link()` updates the page with S3 URL after upload
 - Splits transcript by speaker turns (blank lines) not arbitrary character counts
+- Transcript lives inside a collapsible Heading 3 toggle (`is_toggleable`), hidden by default: the toggle heading is created first, then transcript paragraphs are appended as its `children` in 100-block batches
 - 2000-char block limit, 100 blocks per API request
 
 **Transcript caching (transcriber.py):**
