@@ -12,47 +12,19 @@ notion = Client(auth=os.environ.get("NOTION_API_KEY"))
 DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 
 
-def create_meeting_page(
-    title: str,
+def build_meeting_blocks(
     date: str,
     duration_minutes: float,
     analysis: dict,
     transcript: str,
     costs: dict,
-    source_file: str = ""
-) -> str:
+) -> tuple[list, list]:
+    """Build the Notion body for a meeting from an analysis dict.
+
+    Returns (blocks, transcript_blocks): the non-transcript body blocks and the
+    transcript paragraphs (which get nested in a collapsible toggle on append).
+    Shared by create_meeting_page() and repair_meeting_page().
     """
-    Create a Notion page with meeting analysis.
-    
-    Returns the URL of the created page.
-    """
-    # Create page with database properties
-    page = notion.pages.create(
-        parent={"database_id": DATABASE_ID},
-        properties={
-            "Name": {
-                "title": [{"text": {"content": title}}]
-            },
-            "Date": {
-                "date": {"start": date}
-            },
-            "Duration": {
-                "rich_text": [{"text": {"content": f"{duration_minutes:.0f} minutes"}}]
-            },
-            "Status": {
-                "select": {"name": "Complete"}
-            },
-            "Cost": {
-                "number": round(costs.get("total", 0), 4)
-            },
-            "Source File": {
-                "rich_text": [{"text": {"content": source_file}}]
-            }
-        }
-    )
-    
-    page_id = page["id"]
-    
     # Build content blocks
     blocks = []
 
@@ -226,11 +198,14 @@ def create_meeting_page(
                 "paragraph": {"rich_text": [{"type": "text", "text": {"content": turn}}]}
             })
 
-    # Append all non-transcript blocks to the page
-    # Notion limits to 100 blocks per request, so batch if needed
+    return blocks, transcript_blocks
+
+
+def _append_body(page_id: str, blocks: list, transcript_blocks: list) -> None:
+    """Append body blocks to a page, then the transcript inside a collapsible
+    toggle. Notion limits to 100 blocks per request, so batch."""
     for i in range(0, len(blocks), 100):
-        batch = blocks[i:i+100]
-        notion.blocks.children.append(page_id, children=batch)
+        notion.blocks.children.append(page_id, children=blocks[i:i+100])
 
     # Add the transcript inside a collapsible Heading 3 toggle so it stays
     # hidden by default. Create the toggle heading first, then nest the
@@ -244,12 +219,87 @@ def create_meeting_page(
     }])
     toggle_id = toggle_resp["results"][0]["id"]
     for i in range(0, len(transcript_blocks), 100):
-        batch = transcript_blocks[i:i+100]
-        notion.blocks.children.append(toggle_id, children=batch)
+        notion.blocks.children.append(toggle_id, children=transcript_blocks[i:i+100])
 
-    # Return the page URL and page ID
+
+def create_meeting_page(
+    title: str,
+    date: str,
+    duration_minutes: float,
+    analysis: dict,
+    transcript: str,
+    costs: dict,
+    source_file: str = ""
+) -> dict:
+    """
+    Create a Notion page with meeting analysis.
+
+    Returns {"url", "page_id"}.
+    """
+    page = notion.pages.create(
+        parent={"database_id": DATABASE_ID},
+        properties={
+            "Name": {"title": [{"text": {"content": title}}]},
+            "Date": {"date": {"start": date}},
+            "Duration": {"rich_text": [{"text": {"content": f"{duration_minutes:.0f} minutes"}}]},
+            "Status": {"select": {"name": "Complete"}},
+            "Cost": {"number": round(costs.get("total", 0), 4)},
+            "Source File": {"rich_text": [{"text": {"content": source_file}}]},
+        }
+    )
+    page_id = page["id"]
+
+    blocks, transcript_blocks = build_meeting_blocks(
+        date, duration_minutes, analysis, transcript, costs
+    )
+    _append_body(page_id, blocks, transcript_blocks)
+
     page_url = f"https://notion.so/{page_id.replace('-', '')}"
     return {"url": page_url, "page_id": page_id}
+
+
+def repair_meeting_page(
+    page_id: str,
+    date: str,
+    duration_minutes: float,
+    analysis: dict,
+    transcript: str,
+    costs: dict,
+) -> dict:
+    """Rebuild the body of an EXISTING page from a (recovered) analysis dict.
+
+    Deletes all current child blocks, then re-appends the full body. Preserves
+    any existing S3 Meeting Link by reading it before the wipe and re-applying
+    it afterward. Page properties (Name, Status, etc.) are left untouched.
+    """
+    existing = notion.blocks.children.list(page_id)["results"]
+
+    # Preserve the S3 meeting link if one was already set.
+    meeting_url = None
+    for block in existing:
+        if block["type"] == "paragraph":
+            for rt in block["paragraph"].get("rich_text", []):
+                href = rt.get("href") or (rt.get("text") or {}).get("link")
+                if href:
+                    meeting_url = href["url"] if isinstance(href, dict) else href
+                    break
+        if meeting_url:
+            break
+
+    # Wipe existing body blocks (archive — Notion keeps them recoverable).
+    for block in existing:
+        notion.blocks.delete(block["id"])
+
+    blocks, transcript_blocks = build_meeting_blocks(
+        date, duration_minutes, analysis, transcript, costs
+    )
+    _append_body(page_id, blocks, transcript_blocks)
+
+    if meeting_url:
+        update_meeting_link(page_id, meeting_url)
+
+    page_url = f"https://notion.so/{page_id.replace('-', '')}"
+    return {"url": page_url, "page_id": page_id, "restored_link": meeting_url}
 
 
 def update_meeting_link(page_id: str, meeting_url: str) -> None:

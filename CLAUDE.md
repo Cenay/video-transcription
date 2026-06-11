@@ -72,11 +72,17 @@ scripts/
 
 **Analysis (analyzer.py):**
 - Prompt requests JSON with: overview (bullets), summary (narrative), notes (topical sections with emojis), keywords, action_items (grouped by owner), decisions, meeting_metadata
-- Handles markdown code blocks in response
-- Tracks token usage for cost reporting
+- `_extract_json()` strips markdown fences and stray prose before parsing
+- **Retries** up to 3× on `JSONDecodeError` (the model occasionally returns malformed JSON), nudging it toward JSON-only; warns loudly on `stop_reason == "max_tokens"`. Only returns an `{"error", "raw_response"}` marker after all attempts fail (see [LESSONS_LEARNED.md](docs/LESSONS_LEARNED.md))
+- `max_tokens` default 8192; tracks token usage for cost reporting
+
+**Pipeline guard (pipeline.py):**
+- If analysis still contains `"error"` after retries, **aborts before Notion/S3** — saves the raw reply to `…-FAILED-ANALYSIS.txt` and prints a loud message rather than publishing an empty page
 
 **Notion output (notion_output.py):**
 - Fireflies-style format: metadata header → overview → summary → notes → keywords → action items (by person) → decisions → costs → transcript
+- Body-building is factored into `build_meeting_blocks()` + `_append_body()`, shared by `create_meeting_page()` and `repair_meeting_page()`
+- `repair_meeting_page()` rebuilds an existing page's body in place (deletes current blocks, re-appends) while preserving its S3 Meeting Link — used to recover a page after an analysis failure
 - `update_meeting_link()` updates the page with S3 URL after upload
 - Splits transcript by speaker turns (blank lines) not arbitrary character counts
 - Transcript lives inside a collapsible Heading 3 toggle (`is_toggleable`), hidden by default: the toggle heading is created first, then transcript paragraphs are appended as its `children` in 100-block batches

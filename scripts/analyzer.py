@@ -75,59 +75,101 @@ TRANSCRIPT:
 Return ONLY valid JSON, no additional text or markdown formatting."""
 
 
+def _extract_json(text: str) -> str:
+    """Pull the JSON object out of a model reply that may wrap it in markdown
+    fences or surround it with stray prose."""
+    t = text.strip()
+    if "```json" in t:
+        t = t.split("```json", 1)[1].split("```", 1)[0]
+    elif "```" in t:
+        t = t.split("```", 1)[1].split("```", 1)[0]
+    t = t.strip()
+    # Trim anything before the first { and after the last } (defensive against
+    # leading/trailing prose the model sometimes adds despite instructions).
+    start, end = t.find("{"), t.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        t = t[start:end + 1]
+    return t
+
+
 def analyze_transcript(
     transcript: str,
     model: str = "claude-sonnet-4-20250514",
-    max_tokens: int = 4096
+    max_tokens: int = 8192,
+    max_attempts: int = 3,
 ) -> dict:
     """
     Analyze a transcript using Claude.
-    
+
+    Retries on JSON parse failure (the model occasionally returns malformed
+    JSON or stray prose) before falling back to an explicit error marker, so a
+    one-off bad response can't silently produce an empty page.
+
     Args:
         transcript: Full transcript text
         model: Claude model to use
         max_tokens: Maximum response tokens
-        
+        max_attempts: How many times to retry on a JSON parse failure
+
     Returns:
-        Parsed analysis dict
+        Parsed analysis dict, or {"error", "raw_response", "_usage"} if every
+        attempt failed to parse.
     """
     prompt = ANALYSIS_PROMPT.format(transcript=transcript)
-    
-    response = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-    
-    # Extract text from response
-    response_text = response.content[0].text
-    
-    # Parse JSON from response
-    try:
-        # Handle potential markdown code blocks
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0]
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0]
-        
-        analysis = json.loads(response_text.strip())
-    except json.JSONDecodeError as e:
-        # Return raw text if JSON parsing fails
-        analysis = {
-            "error": f"Failed to parse JSON: {e}",
-            "raw_response": response_text
-        }
-    
-    # Add usage stats
-    analysis["_usage"] = {
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
-        "model": model
+    messages = [{"role": "user", "content": prompt}]
+
+    total_input = total_output = 0
+    last_error = None
+    last_response = ""
+
+    for attempt in range(1, max_attempts + 1):
+        response = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            messages=messages,
+        )
+        total_input += response.usage.input_tokens
+        total_output += response.usage.output_tokens
+        last_response = response.content[0].text
+
+        # A truncated response is the classic cause of invalid JSON — surface it.
+        if response.stop_reason == "max_tokens":
+            print(f"  ⚠️  Analysis hit max_tokens ({max_tokens}) on attempt "
+                  f"{attempt} — response truncated, JSON will be incomplete")
+
+        try:
+            analysis = json.loads(_extract_json(last_response))
+            analysis["_usage"] = {
+                "input_tokens": total_input,
+                "output_tokens": total_output,
+                "model": model,
+                "attempts": attempt,
+            }
+            return analysis
+        except json.JSONDecodeError as e:
+            last_error = e
+            print(f"  ⚠️  Analysis JSON parse failed on attempt "
+                  f"{attempt}/{max_attempts}: {e}")
+            # Nudge the model toward strictly valid JSON on the retry.
+            messages = [{
+                "role": "user",
+                "content": prompt + "\n\nIMPORTANT: Your previous reply was not "
+                "valid JSON. Reply with ONLY a single valid JSON object — no "
+                "prose, no markdown fences, no trailing commentary.",
+            }]
+
+    # Every attempt failed — return an explicit error so the pipeline aborts
+    # instead of publishing an empty page.
+    return {
+        "error": f"Failed to parse JSON after {max_attempts} attempts: {last_error}",
+        "raw_response": last_response,
+        "_usage": {
+            "input_tokens": total_input,
+            "output_tokens": total_output,
+            "model": model,
+            "attempts": max_attempts,
+        },
     }
-    
-    return analysis
 
 
 def estimate_analysis_cost(transcript: str, model: str = "claude-sonnet-4-20250514") -> dict:

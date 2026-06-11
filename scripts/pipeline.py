@@ -215,7 +215,22 @@ def process_video(
             print(f"  Actual analysis cost: ${actual_cost:.4f}")
         
         result["analysis"] = analysis
-        
+
+        # Guard: if analysis failed to parse after retries, abort BEFORE creating
+        # a Notion page or uploading to S3. Publishing an empty "No summary
+        # available" page (and paying to host it) is worse than failing loudly.
+        if "error" in analysis:
+            cache_dir = temp_dir / "transcribe-cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            raw_path = cache_dir / f"{video_path.stem}-FAILED-ANALYSIS.txt"
+            raw_path.write_text(analysis.get("raw_response", ""))
+            print(f"\n❌ Analysis failed: {analysis['error']}")
+            print(f"   Raw response saved to: {raw_path}")
+            print("   Aborting — no Notion page created, no S3 upload.")
+            print("   Re-run with --from-cache once resolved (no re-transcription cost).")
+            result["error"] = analysis["error"]
+            return result
+
         # Calculate total cost
         result["costs"]["total"] = (
             result["costs"].get("transcription", 0) +
