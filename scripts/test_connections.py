@@ -31,10 +31,11 @@ def test_anthropic():
     print("Testing Anthropic connection...", end=" ")
     try:
         import anthropic
+        from analyzer import MODEL
         client = anthropic.Anthropic()
         # Minimal API call to verify
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=MODEL,
             max_tokens=10,
             messages=[{"role": "user", "content": "Say 'connected' and nothing else."}]
         )

@@ -10,7 +10,13 @@ load_dotenv()
 
 client = Anthropic()
 
-# Pricing per million tokens (Claude Sonnet 4.5)
+# Claude model used for analysis. Bump this one line to change models everywhere
+# (test_connections.py and diagnose_analysis.py import it from here).
+# Use a no-date alias so a new dated snapshot doesn't 404 the pipeline; a major
+# version bump (e.g. to Opus, or Sonnet 5) is a deliberate edit here.
+MODEL = "claude-sonnet-4-6"
+
+# Pricing per million tokens (Claude Sonnet 4.6)
 INPUT_COST_PER_M = 3.00
 OUTPUT_COST_PER_M = 15.00
 
@@ -94,7 +100,7 @@ def _extract_json(text: str) -> str:
 
 def analyze_transcript(
     transcript: str,
-    model: str = "claude-sonnet-4-20250514",
+    model: str = MODEL,
     max_tokens: int = 8192,
     max_attempts: int = 3,
 ) -> dict:
@@ -172,7 +178,7 @@ def analyze_transcript(
     }
 
 
-def estimate_analysis_cost(transcript: str, model: str = "claude-sonnet-4-20250514") -> dict:
+def estimate_analysis_cost(transcript: str, model: str = MODEL) -> dict:
     """
     Estimate the cost to analyze a transcript.
     

@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import anthropic
 
 sys.path.insert(0, str(Path(__file__).parent))
-from analyzer import ANALYSIS_PROMPT
+from analyzer import ANALYSIS_PROMPT, MODEL
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -19,7 +19,7 @@ transcript = data["raw_text"]
 
 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 resp = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model=MODEL,
     max_tokens=4096,
     messages=[{"role": "user", "content": ANALYSIS_PROMPT.format(transcript=transcript)}],
 )
