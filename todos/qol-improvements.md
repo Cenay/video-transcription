@@ -9,7 +9,11 @@ to the **Open** list as they come up; move them to **Done** with a date when shi
 
 ## Open
 
-_(nothing open)_
+### Clean up dead code in `analyzer.py`
+Pylance flags two unused items (harmless, pre-existing):
+- Line 4: `import os` is unused — remove it.
+- `estimate_analysis_cost()` takes a `model` parameter it never uses in the body —
+  either use it (e.g. for per-model pricing) or drop the param.
 
 ---
 
