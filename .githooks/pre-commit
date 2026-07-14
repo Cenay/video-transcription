@@ -1,0 +1,86 @@
+#!/bin/bash
+# Pre-commit hook: scan staged files for potential secrets
+# Blocks commits containing API keys, passwords, tokens, or other sensitive patterns
+#
+# This hook is TRACKED in git (.githooks/), so it travels with the repo.
+# Each developer must activate it once per clone:
+#     git config core.hooksPath .githooks
+#
+# Docs: /mnt/k/Code/TRFA/docs/secrets-guard.md
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+KEY_PATTERNS=(
+  'api[_-]?key\s*[:=]\s*["\x27][A-Za-z0-9]'
+  'secret[_-]?key\s*[:=]\s*["\x27][A-Za-z0-9]'
+  'api[_-]?secret\s*[:=]\s*["\x27][A-Za-z0-9]'
+  'password\s*[:=]\s*["\x27][^\s]'
+  'token\s*[:=]\s*["\x27][A-Za-z0-9]'
+  'BOOKEO_API_KEY\s*=\s*[^.]'
+  'BOOKEO_API_SECRET\s*=\s*[^.]'
+  'BOOKEO_SECRET_KEY\s*=\s*[^.]'
+  'AC_API_KEY\s*=\s*[^.]'
+  'ACTIVECAMPAIGN_API_KEY\s*=\s*[^.]'
+  'SUPABASE_SERVICE_KEY\s*=\s*[^.]'
+  'ANTHROPIC_API_KEY\s*=\s*[^.]'
+  'NOTION_API_KEY\s*=\s*[^.]'
+  'ENCRYPTION_KEY\s*=\s*[^.]'
+  'DB_PASSWORD\s*=\s*[^.[:space:]]'
+  'MAIL_PASSWORD\s*=\s*[^.[:space:]]'
+  'APP_KEY\s*=\s*base64:'
+  'sk-[a-zA-Z0-9]{20,}'
+  'eyJ[a-zA-Z0-9]{30,}'
+  'AKIA[0-9A-Z]{16}'
+  'AIza[0-9A-Za-z_-]{35}'
+  'gh[pousr]_[A-Za-z0-9]{36,}'
+  'xox[baprs]-[A-Za-z0-9-]{10,}'
+  '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+)
+
+SKIP_PATTERNS='\.lock$|node_modules|\.git/|\.env\.example$|package-lock\.json$|composer\.lock$|^docs/|^\.githooks/'
+
+found_secrets=0
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged_files" ] && exit 0
+
+for file in $staged_files; do
+  echo "$file" | grep -qE "$SKIP_PATTERNS" && continue
+  [ ! -f "$file" ] && continue
+
+  content=$(git show ":$file" 2>/dev/null)
+  [ -z "$content" ] && continue
+
+  for pattern in "${KEY_PATTERNS[@]}"; do
+    # Match the pattern, then exclude safe forms:
+    #   - env var lookups (env(), config(), getenv(), process.env)
+    #   - empty assignments and "..." placeholders
+    #   - any line explicitly marked: # pragma: allowlist secret
+    matches=$(echo "$content" | grep -inE "$pattern" 2>/dev/null | grep -ivE 'os\.getenv|process\.env|getenv\(|env\(|config\(|=\s*["\x27]{2}$|=\s*["\x27]["\x27]\s*[;,)#]|=\s*["\x27]?\.\.\.|pragma:\s*allowlist' 2>/dev/null)
+    if [ -n "$matches" ]; then
+      if [ $found_secrets -eq 0 ]; then
+        echo ""
+        echo -e "${RED}╔══════════════════════════════════════════════════╗${NC}"
+        echo -e "${RED}║  SECRETS DETECTED — COMMIT BLOCKED               ║${NC}"
+        echo -e "${RED}╚══════════════════════════════════════════════════╝${NC}"
+        echo ""
+      fi
+      found_secrets=1
+      echo -e "${YELLOW}File:${NC} $file"
+      echo "$matches" | head -3 | while read -r line; do
+        echo -e "  ${RED}→${NC} $line"
+      done
+      echo ""
+    fi
+  done
+done
+
+if [ $found_secrets -ne 0 ]; then
+  echo -e "${YELLOW}If these are intentional (e.g., documentation placeholders):${NC}"
+  echo -e "  git commit --no-verify"
+  echo ""
+  exit 1
+fi
+
+exit 0
