@@ -1,0 +1,227 @@
+# GitHub Issue Form — bug report
+# Enforces the TRFA Bug Report Style Guide (.claude/guides/bug-report-style.md)
+# at issue-creation time for anyone opening "New Issue" in the browser.
+#
+# ⚠️ Corrected 2026-07-21: this comment used to say the form served "the plain-GitHub
+# teammate (Khurram)". Not so — Khurram uses Claude for session work (CoPilot only for
+# commit messages), so BOTH devs file through /file-bug. This form is the SECONDARY
+# path: quick browser-filed issues, and anyone outside the two devs.
+#
+# Schema reference (verified 2026-07-16):
+#   https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+#   https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
+# Top-level keys: name, description, title, labels, assignees, body[]
+# body element types: markdown | input | textarea | dropdown | checkboxes
+#
+# INSTALL: synced by scripts/sync-shared.sh into each repo's
+# .github/ISSUE_TEMPLATE/bug_report.yml. Do NOT edit the copy inside a repo — edit
+# this template and re-run the sync. Note GitHub only reads Issue Forms from a
+# repo's DEFAULT BRANCH, so the synced commit must reach main to take effect.
+
+name: Bug Report
+description: Report a defect or a suspicion. Only a handful of fields are required — file it even if you can't verify it yet.
+title: "[Bug]: "
+labels: ["bug"]
+# NOTE: an Issue Form cannot apply a label CONDITIONALLY on a dropdown answer, so the
+# "Confirmed or Suspected" lane below is recorded in the issue BODY only. Applying the
+# `status:suspected` label is a manual triage step (or done by /file-bug). Don't assume
+# the absence of that label means "confirmed" — read the body field.
+# assignees: []   # uncomment + add default assignees per repo if desired
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing. This form follows the **Bug Report Style Guide**.
+
+        **Only six fields are required** — summary, lane, severity, who found it, when,
+        and what you observed. File and line, cause, reproduce steps and expected-vs-actual
+        are all **optional**, because you often don't have them yet. Fill in what you know.
+
+        **Aim for independently verifiable** where you can: name the exact file and line,
+        quote the offending code, give a concrete way to reproduce. That makes a report
+        actionable without anyone having to trust the reporter.
+
+        **But never let that stop you filing.** If you can't verify it, choose the
+        **Suspected** lane and mark the shaky facts — `~120 (unverified)`, or name the
+        function instead of a line. The only real rule: **never invent** a line number,
+        error string, table/column name, or config key, and never present a guess *as* a
+        confirmed fact. An honestly-labelled hunch is a first-class entry here.
+
+        The GitHub **issue number is the permanent ID** (it replaces `BUG-YYYY-MM-DD-NNN`),
+        and the **issue creation timestamp** is the "found" time of record.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Short imperative summary of the defect. This becomes the issue title after the `[Bug]:` prefix.
+      placeholder: "Homepage placeholder renders invisibly behind the fixed header"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: Confirmed or Suspected
+      description: >
+        The two lanes from the bug-report style guide.
+        **Confirmed** = you have SEEN this defect in the source or at runtime, and the
+        file/line/error strings below are verified. **Suspected** = a hunch that needs
+        research — a pattern that usually causes trouble, an inferred consequence you
+        have not observed, or a line you could not fully verify. Filing a hunch is fine
+        and useful; filing a hunch DRESSED AS a confirmed defect is not. When in doubt,
+        choose Suspected — nobody is penalised for it.
+      options:
+        - Confirmed — observed in source or at runtime
+        - Suspected — needs investigation
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: >
+        About CONSEQUENCE, not how hard the fix is.
+        Critical = data loss / security / silent corruption ·
+        High = documented feature broken or error silently swallowed ·
+        Medium = wrong behaviour in an edge case or a future-bug maintenance trap ·
+        Low = cosmetic, dead code, or a nuisance with an easy workaround.
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+      default: 2
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: File and line
+      description: >
+        `path/to/File.ext:LINE`, relative to the repo root. Verify the line against the
+        actual file where you can. List multiple sites if it spans several: `File.ext:59, :103`.
+        Use `N/A (…)` for pure infrastructure/config defects with no code site.
+        NOT verified? Say so rather than dropping the report — `File.ext:~120 (unverified)`,
+        or give just the function name, which survives line drift anyway. A bare exact
+        line number reads as verified, so don't write one you haven't checked.
+      placeholder: "site/resources/views/root.blade.php:42"
+    validations:
+      required: false
+
+  - type: input
+    id: function
+    attributes:
+      label: Function / method
+      description: Name the function or method — it survives line-number drift. Use `N/A` for config/infra.
+      placeholder: "handleRedirect()"
+    validations:
+      required: false
+
+  - type: input
+    id: found-by
+    attributes:
+      label: Found by
+      description: >
+        Model + surface (`Claude Opus 4.8 (Terminal)`) or a person's name. Write `unknown`
+        if provenance is truly unknown — never guess.
+      placeholder: "Khurram (Junie)   —or—   Claude Opus 4.8 (Terminal)"
+    validations:
+      required: true
+
+  - type: input
+    id: found-at
+    attributes:
+      label: When found (with timezone)
+      description: >
+        `YYYY-MM-DD HH:MM ZZ`, 24-hour clock, timezone ALWAYS named (ET, CT, PT, MST, PKT, UTC…).
+        A timestamp with no zone is not accepted. Use the zone the work happened in — do not convert.
+      placeholder: "2026-07-16 18:27 MST"
+    validations:
+      required: true
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Symptom
+      description: What a developer or user actually OBSERVES — externally visible behaviour, not internals.
+      placeholder: "The placeholder does not appear in the browser, though curl confirms it IS in the served HTML."
+    validations:
+      required: true
+
+  - type: textarea
+    id: cause
+    attributes:
+      label: Cause
+      description: >
+        Why the code is wrong. Quote the offending lines in a fenced code block with a
+        `// line N` comment. If you are inferring consequence rather than observing it,
+        say so ("this WOULD throw when…"), don't dress a suspicion as a confirmed defect.
+      placeholder: |
+        ```php
+        if (!$details && $redirect) {   // line 118
+        ```
+        The guard redirects before the view is resolved, so …
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduce
+      description: The exact command, request, or input that triggers it. This will be rendered as-is.
+      placeholder: "GET /some/route/999999/false"
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected vs Actual
+      description: What should happen, and what actually happens. Quote exact error strings only if you have SEEN them.
+      placeholder: |
+        **Expected:** the placeholder heading/paragraph visible between header and footer.
+        **Actual:** blank band; content hidden behind the fixed header.
+    validations:
+      required: false
+
+  - type: textarea
+    id: suggested-fix
+    attributes:
+      label: Suggested fix
+      description: What to change, and what to check BEFORE changing it. Optional but strongly encouraged.
+      placeholder: "Give the section top-space to clear the fixed header (temp inline padding-top to confirm, then a theme class)."
+    validations:
+      required: false
+
+  - type: input
+    id: transcript
+    attributes:
+      label: Transcript (Claude sessions only)
+      description: The `.jsonl` session ID under `~/.claude/projects/`, so the reasoning is recoverable. Leave blank if unavailable — never invent one.
+      placeholder: "6ac1eb0b-ffb2-41f7-a9dc-6173991fd4a8"
+    validations:
+      required: false
+
+  - type: input
+    id: related-doc
+    attributes:
+      label: Related doc
+      description: A module/narrative doc that covers this area, if any (the ledger is the record; the module doc is the narrative).
+      placeholder: "docs/LESSONS_LEARNED.md (2026-07-16 optimize:clear entry)"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: honesty
+    attributes:
+      label: Verification checklist
+      description: The style guide's honesty rules. A confidently-worded wrong report costs more than the bug.
+      options:
+        - label: Every specific fact I cite (line number, error string, table/column, config key) is either verified against the source, OR explicitly marked as unverified — e.g. `~120 (unverified)`, "message approximate". I have not invented any of them.
+          required: true
+        - label: The lane above is honest. If I chose **Confirmed**, I have actually seen this defect in the source or at runtime — it is not "a pattern that usually causes X". If I chose **Suspected**, I have said plainly in Cause what is inferred rather than observed.
+          required: true

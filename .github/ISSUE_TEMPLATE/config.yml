@@ -1,0 +1,25 @@
+# .github/ISSUE_TEMPLATE/config.yml
+# Controls the "New Issue" chooser for a repo.
+#
+# Synced by scripts/sync-shared.sh from claude-personal-toolkit (the source of truth).
+# Do NOT edit this copy inside a repo — edit the toolkit template and re-run the sync.
+# The owner/repo placeholder in the URLs below is filled in per repo from its origin
+# remote at sync time (written lowercase here so the substitution doesn't rewrite this
+# comment into nonsense).
+#
+# blank_issues_enabled is TRUE during the pilot: the blank-issue escape hatch stays
+# open so quick non-bug issues (questions, tasks) are still possible while the Bug
+# Report form proves itself. Flip to false once the form is trusted AND a
+# feature_request.yml exists to catch the non-bug cases — without that second form,
+# false blocks every issue that isn't a bug.
+#
+# contact_links: signposts shown on the chooser (they are NOT issue forms).
+
+blank_issues_enabled: true
+contact_links:
+  - name: Bug Report Style Guide
+    url: https://github.com/Cenay/video-transcription/blob/main/.claude/guides/bug-report-style.md
+    about: The format this bug form enforces — read it if a field is unclear.
+  - name: Legacy Markdown bug ledger (being retired)
+    url: https://github.com/Cenay/video-transcription/blob/main/docs/BUG-REPORT.md
+    about: The old in-repo ledger. Still mirrored during the pilot; will be retired once Issues are proven.

@@ -5,27 +5,33 @@ description: End-of-session save — update project status, TODOs, next steps, a
 
 You are performing an end-of-session checkpoint for the current project. This preserves context so the next session (or a different agent) can resume without loss.
 
+**Formatting:** the docs you write below follow the documentation style reference — `guides/doc-style-reference.md` (this toolkit) or `.claude/guides/doc-style-reference.md` (a shared repo). It's guidance to keep docs consistent, not a gate — never let a formatting nitpick block a checkpoint.
+
 ## Step 1: Assess Current State
 
 Read the following files if they exist:
 - `CLAUDE.md` (for project name and context)
 - `docs/CURRENT_STATUS.md` (previous status)
 - `docs/NEXT_STEPS.md` (previous next steps)
-- `docs/TODOS.md` (previous TODOs)
+- `docs/TODO(S).md` (previous TODOs)
 - `docs/LESSONS_LEARNED.md` (previous lessons)
 - `docs/CHANGELOG.md` (previous changelog)
 - `plans/*.md` (any active plans — check for `status: in-progress`)
 
-Also run `git log --oneline -20` and `git diff --stat` to see what changed this session.
+Also run `git log --oneline -20` and `git diff --stat` to see what changed this session. Note the branch currently in use.
 
 ## Step 2: Update docs/CURRENT_STATUS.md
 
-Rewrite this file based on the current conversation and git history. Use this structure:
+Rewrite this file based on the current conversation and git history. **Get the stamp from the machine's own clock — run `date "+%Y-%m-%d %H:%M %Z"` and paste the output verbatim; never guess the time or the zone.** Use this structure:
 
 ```markdown
 # Current Status
-**Last updated:** {TODAY'S DATE + TIME} (session N)   <!-- date, 24-hour time, AND timezone, e.g. 2026-07-14 19:46 MST. Two devs across zones (Arizona MST, Pakistan PKT) ship in one day — the date alone can't tell them apart, and the TZ makes two times comparable. -->
+**Last updated:** YYYY-MM-DD HH:MM TZ (session N)   <!-- exact format, e.g. 2026-07-17 09:47 MST — 24-hour time AND timezone, taken verbatim from `date "+%Y-%m-%d %H:%M %Z"`. /resume echoes this line back exactly, so the format must not drift. Two devs across zones (Arizona MST, Pakistan PKT) ship in one day — the date alone can't tell them apart, and the TZ makes two times comparable. -->
+```
 
+**One `**Last updated:**` line, in this exact shape, is what `/resume` reads and echoes back — keep it the first non-heading line so it's unambiguous to find.**
+
+```markdown
 ## Session Summary
 {1-3 sentences summarizing what was accomplished}
 
@@ -44,7 +50,7 @@ Rewrite this file based on the current conversation and git history. Use this st
 
 Create `docs/` directory if it doesn't exist.
 
-## Step 3: Update docs/TODOS.md and docs/NEXT_STEPS.md
+## Step 3: Update docs/TODO(S).md and docs/NEXT_STEPS.md
 
 **TODOS.md** — review the conversation for any TODOs that were discovered, completed, or added:
 - Mark completed items: strike through (`~~…~~`) + `✅ DONE {TODAY'S DATE + TIME}` (or move to a Completed section with today's date **and time**)
@@ -83,6 +89,8 @@ Categories: Workflow, Code, Tool, Architecture, Integration, Data, Deployment
 
 If nothing notable happened, skip this step — don't invent lessons.
 
+**Bugs found this session?** A lesson explains something you learned; a *bug* is a place the code does the wrong thing. If the session uncovered a real, verifiable defect, log it in the project's bug ledger (`docs/BUG-REPORT.md`) per the bug-report style guide — `guides/bug-report-style.md` (this toolkit) or `.claude/guides/bug-report-style.md` (a shared repo) — or just run `/bug`. If instead you have an *unconfirmed suspicion* that needs research, don't force it or drop it — file it as a `SUSP-` (suspected) entry via `/bug`, which labels it honestly and records how to confirm it. Either way, never dress a hunch as a confirmed bug. This is optional and never blocks the checkpoint.
+
 ## Step 5: Update docs/CHANGELOG.md
 
 Add a new entry at the top of the changelog (below the `# Changelog` header) summarizing what was built/changed/fixed this session. Use Keep a Changelog format:
@@ -119,7 +127,7 @@ If the project applies migrations by hand (e.g. Supabase SQL editor) and uses a 
 Show a brief summary:
 - Files updated (with what changed)
 - Key status for next session
-- Any TODOs that need attention
+- Any TODO(s) that need attention
 
 Then ask:
 

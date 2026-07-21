@@ -66,6 +66,12 @@ path-based and authoritative.
 the same set `/init-project` scaffolds — the two commands share one contract. Reviewing
 means *reading it and confirming it is still true*, not just appending to it.
 
+**Formatting the docs you touch:** follow the documentation style reference —
+`guides/doc-style-reference.md` (toolkit) or `.claude/guides/doc-style-reference.md`
+(shared repo). It keeps entries consistent, but it is **guidance, not a gate**: a
+style imperfection never blocks the commit. Reconcile the content, apply the style
+where it's cheap, ship.
+
 | File | What "reconciled" means |
 |------|-------------------------|
 | **`<DOCS>/NEXT_STEPS.md`** | The pick-up point. Any "Pick Up Here" item this work **closed or abandoned** moves to **Recently Closed** with today's absolute date, time **and timezone** (`YYYY-MM-DD HH:MM TZ`, e.g. `2026-07-14 19:46 MST`) and the outcome. Add follow-ups the work spawned. **Never silently delete an item.** |
@@ -80,6 +86,12 @@ there — never create a second one alongside it.**
 
 **Also update when relevant (do not create uninvited):**
 
+- **`<DOCS>/BUG-REPORT.md`** — if this work uncovered a real, verifiable defect (or
+  fixed one), record it per `bug-report-style.md` — newest-first, with a verified
+  file:line and symbol. A fix flips an existing entry to **Status: Fixed** with the
+  commit SHA rather than deleting it. An *unconfirmed* suspicion that needs research
+  goes in the ledger's `## Suspected / Needs Investigation` section as a `SUSP-` entry,
+  not as a hedged bug. (Or run `/bug`.) Opt-in per real find — not a mandatory section.
 - **`CHANGELOG.md`** — dated entry, if the project keeps one.
 - **`CLAUDE.md`** — only when the project's *shape* changed: commands, architecture, env
   vars, workflows, ground rules. A stale CLAUDE.md misleads every future session.
@@ -99,6 +111,56 @@ grep -rni "<the closed thing>" docs/ *.md
 ```
 
 Every hit must read as closed or superseded, not live. Fix any that don't.
+
+### 4b. Deep-link decision references (DEC / G / M / D)
+
+**First, un-wrap hard-wrapped prose.** Markdown prose and list items must each be
+ONE continuous physical line (editors soft-wrap) — hard line breaks mid-sentence
+render as broken text and make diffs noisy. Do NOT hand-wrap prose while writing,
+and enforce it mechanically before linking. **If `.claude/scripts/reflow-md.py`
+exists in this repo, run it** — it joins wrapped prose/list items while leaving code
+blocks, tables, blockquotes, headings, frontmatter, and the managed link block
+untouched:
+
+```bash
+python3 .claude/scripts/reflow-md.py <DOCS>   # e.g. docs  or  .cloaked/docs
+# add --dry-run first to preview
+```
+
+Run reflow **before** the linker below, so the link block is regenerated against the
+un-wrapped prose.
+
+Long status docs cross-reference decisions by ID — `DEC-111`, `G75`, `M-100`,
+`D-015`. A reader who isn't steeped in the project can't tell what those mean or
+where to read them. After the docs are reconciled, turn every bare ID into a deep
+link to its entry in the ledger.
+
+**If `.claude/scripts/link-doc-refs.py` exists in this repo, run it — it does the
+whole job deterministically and idempotently:**
+
+```bash
+python3 .claude/scripts/link-doc-refs.py <DOCS>   # e.g. docs  or  .cloaked/docs
+# add --dry-run first to preview
+```
+
+How it works:
+- Links are **reference-style** — inline prose stays clean (`[DEC-111]`), and every
+  URL collects in an auto-generated `<!-- link-doc-refs -->` block at the file
+  bottom. The block regenerates each run, so slugs self-heal if a heading is
+  reworded; the inline text never changes.
+- Targets are the ledger's real **heading slugs** (`DECISIONS.md#dec-111-…`), which
+  is what VS Code's markdown preview *and* GitHub navigate to. (Hidden `<a id>`
+  anchors do **not** work in VS Code preview — don't use them.)
+- Definitions come only from the ledger / frozen records (`DECISIONS.md`, `intake/`,
+  `discovery/`, `archive/`); those files are targets and are never rewritten.
+  Narrative docs are where links get added.
+- A **resolved** decision links to its own `### DEC-NNN` heading. An **open** one
+  (a `- [ ] DEC-NNN` checklist row with no heading) links to the section it sits
+  under. An ID with no ledger home at all is left as plain text and reported.
+
+**If the script is absent** (a project outside the shared set), apply the same
+convention by hand *only where it's cheap*: reference-link the IDs in the docs you
+just edited to the target heading's slug. Don't hand-link a whole backlog.
 
 ### 5. Commit
 
