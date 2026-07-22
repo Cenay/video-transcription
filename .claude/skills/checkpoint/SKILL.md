@@ -18,7 +18,17 @@ Saves session state to project files so the next session (or agent) can resume w
 
 ## Session Closeout
 
-**Order of operations matters.** Always follow this sequence:
+**Order of operations matters.** Always follow this sequence.
+
+### Step 0 — Reconcile the docs (MANDATORY, before anything else)
+
+**Invoke the `doc-reconcile` skill and let it finish before touching a single doc below.**
+
+This is a step, not a suggestion. Checkpoint *appends* to docs it does not verify: if `NEXT_STEPS.md` still calls a decision open that the ledger closed last week, Step 1 writes this session's notes on top of that lie and the next reader inherits it with a fresh timestamp vouching for it. Reconcile first and the save lands on true docs.
+
+- **Do not skip because the docs "look fine"** — staleness is a cross-reference problem, invisible from any single file.
+- **Already ran it this session?** Say so in one line and continue to Step 1.
+- **Skill unavailable** (a project outside the shared set): don't block the checkpoint. Do the equivalent by hand — grep the docs for every decision/task you closed this session and confirm none still lists it as open — then note in your report that reconciliation was manual.
 
 ### Step 1 — Update docs (BEFORE any commit/push)
 
@@ -28,7 +38,7 @@ Update these files in the project's `docs/` folder:
 
 1. **`docs/CURRENT_STATUS.md`** — what's done, where we left off
 2. **`docs/NEXT_STEPS.md`** — plain-English handoff note for resuming next session (see below)
-3. **`docs/TODOS.md`** — any new TODOs discovered during the session
+3. **`docs/TODOS.md`** — any new TODOs discovered during the session. **Canonical name is `TODOS.md`; if the repo already has `TODO.md`, write to that. Never create a second one** — two backlog files both look authoritative and items get lost between them.
 4. **`docs/LESSONS_LEARNED.md`** — if any gotchas/lessons were found (create if doesn't exist)
 
 ### Step 1b — Un-wrap prose, then deep-link decision references

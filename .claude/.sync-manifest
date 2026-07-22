@@ -1,11 +1,13 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-07-21 02:06 MST
+# Last synced: 2026-07-21 22:38 MST
 f6d0aecaf27b45e31e11493394719fc7c23f649f128498284fcb56585152c8e7  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
-ea9d071372e7df3dea14154f77e1e31ec7498d483bd45a628c2d621c2a68aeca  .claude/skills/wrap-up/SKILL.md
+c6552a9ff0750ad489cbdf500fddc577f32d8852d07caab3f8ab80b5e7e47531  .claude/skills/wrap-up/SKILL.md
 6f6dd91de6d1e5c91b66d5c6dd5a14f46a6fe05a15977ee3a1e5dc63fa2684a4  .claude/skills/checkpoint/guides/CHECKPOINT_GUIDE.md
-9f83d0c5dcc9a3facd1f0374e045839eb7d32d7438d94655bbc6e1e94e0288d0  .claude/skills/checkpoint/SKILL.md
-2c8364c9f29fa9e6854346cc841fb18c48267dfa30fa13aa417b706a77c7509a  .claude/skills/next-step/SKILL.md
+5a27d9faad8c74d344368a1952007eeaf62efe61ee5e56b78e08d410f9be0b6a  .claude/skills/checkpoint/SKILL.md
+54d3b33f9ceebd2a6b87662bf75561c52d917a5c3a801f2cd44dd829d5951708  .claude/skills/next-step/SKILL.md
+ad65840cdc2f57a8f8f96abf517641e077dbdd1dd9f69ec7ff954963c36b129e  .claude/skills/doc-reconcile/SKILL.md
+fed6edf3ec20c2c48ec58b3233a7aa62f7a7835b50d73aad070af959200e5e86  .claude/skills/doc-reconcile/scripts/check-doc-refs.py
 9fbd19a57152951520402bae8d2ef5cba0cb456ff7adac1ec59580ffba4ccac0  .claude/commands/checkpoint.md
 2f766a880902a889e522853dc74a964c5b06ca72527b29f9d2003f940d293976  .claude/commands/init-project.md
 ff6e92098f1fd6d4d901e5c8dbe25d08a5455b1947d280f422cf8112594d7eb7  .claude/commands/resume.md

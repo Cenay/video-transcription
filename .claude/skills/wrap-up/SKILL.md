@@ -37,6 +37,15 @@ shared codebase, to do something that is now unsafe.
 
 ## Process
 
+### 0. Reconcile the docs (MANDATORY, before anything else)
+
+**Invoke the `doc-reconcile` skill and let it finish before surveying or editing anything.**
+
+Same reason as the core rule above: this skill reconciles the standard doc *set*, but stale **cross-references between** docs — a status doc still calling a decision open that the ledger closed — survive a per-file review because no single file looks wrong. Run it first and steps 1–4 operate on reconciled docs. Step 4's stale-reference sweep then catches only what *this* session changed, which is what it was designed for.
+
+- **Already ran it this session?** Say so in one line and continue to step 1.
+- **Skill unavailable** (a project outside the shared set): don't block the ship. Do step 4's sweep by hand and note in your report that reconciliation was manual.
+
 ### 1. Survey what changed
 
 ```bash

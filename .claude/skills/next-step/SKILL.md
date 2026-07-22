@@ -21,7 +21,7 @@ Reads the project's current state — documentation, plans, code, and git histor
 Read ALL of the following that exist in the current project directory. Skip any that don't exist — not every project has all of these.
 
 1. **PRD.md** (or any PRD file) — master plan, phases, priorities
-2. **TODO.md** / **docs/TODOS.md** — active task lists
+2. **`docs/TODOS.md`** (a few repos use `TODO.md` — read whichever exists) — active task lists
 3. **docs/CURRENT_STATUS.md** — where things stand
 4. **docs/NEXT_STEPS.md** — prior session's handoff notes
 5. **specs/*.md** — active plans and specs (skip archived)
