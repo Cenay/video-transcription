@@ -269,7 +269,11 @@ def check_doc_files(roots, docs):
             lines = fh.readlines()
         for lineno, line in strip_fences(lines):
             for ref in ref_re.findall(line):
-                if os.path.isfile(ref) or os.path.isfile(os.path.join(os.path.dirname(doc), ref)):
+                # Resolve against: cwd, the citing doc's folder, and the repo's PARENT
+                # (sibling-repo citations like `migration/docs/x.md` are normal in a
+                # monorepo-adjacent layout and must not be reported as missing).
+                bases = ('.', os.path.dirname(doc), '..', '../..')
+                if any(os.path.isfile(os.path.join(b, ref)) for b in bases):
                     continue
                 missing.setdefault(ref, []).append((doc, lineno))
 
