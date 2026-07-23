@@ -5,6 +5,8 @@ description: File a bug into the project's ledger (docs/BUG-REPORT.md) — a ver
 
 File a bug report for the current project. The argument is a short description of the defect: `$ARGUMENTS`.
 
+> **Sibling command — `/file-bug`.** This command (`/bug`) is the **ledger-only** lane: it writes the entry into `docs/BUG-REPORT.md` and stops. Its sibling `/file-bug` is the **GitHub lane** — it files the same entry as a native GitHub Issue and mirrors it into the ledger. The two run in parallel by design ([DEC-126]); the format below is identical for both. If this repo files bugs as Issues, prefer `/file-bug`; use `/bug` when you only want the local ledger.
+
 ## The one rule that matters
 
 **A report that misrepresents its own certainty is worse than no report at all.** A *confirmed* bug must be independently verifiable — open the file at the line you're about to cite and confirm the problem is real; never invent a line number, error message, symbol name, table/column name, or config key. A *suspected* issue must be labeled as unproven and say what would confirm it. What's never allowed is filing a hunch dressed as a confirmed defect.

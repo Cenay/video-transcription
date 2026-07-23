@@ -182,7 +182,11 @@ A bug is a place where the code **does the wrong thing**, or will do the wrong t
 
 ## Project-Specific Notes
 
-Everything above is stack-neutral and identical in every repo — **edit it in the toolkit, never in a repo copy.** This section is the one part a repo fills in for itself. When adopting the guide, fill it in and delete the guidance italics; leave the body untouched.
+Everything above — including this section's template — is stack-neutral and identical in every repo. The `.claude/guides/` copy in each shared repo is **managed**: it is md5-synced from the toolkit and drift-guarded, so a repo must **never edit its copy** to fill these in. A filled-in copy either blocks every future sync (the drift guard skips a modified file forever) or loses its notes the next time the sync runs with `--force`.
+
+Instead, the repo records its own answers in a **repo-owned** file and points its bug ledger at it: keep a short `docs/guides/BugReportStyleGuide.md` stub holding only the project-specific notes below, and cite it from the header of `docs/BUG-REPORT.md`. The managed guide stays pristine; the stub is where the repo's specifics live. (fran-dash demonstrates this shape — a Project-Specific-Notes stub that defers to the managed `.claude/guides/bug-report-style.md` for everything else.)
+
+The template below is the checklist of what that stub should answer:
 
 - **Bug ledger path:** `docs/BUG-REPORT.md` _(or `.cloaked/docs/BUG-REPORT.md` where the project uses the `.cloaked/` convention)_
 - **Code root prefix:** _(e.g. `src/`, `app/`, `site/app/` — whatever `file:line` references are relative to)_

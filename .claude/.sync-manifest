@@ -1,6 +1,6 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-07-23 12:37 MST
+# Last synced: 2026-07-23 13:11 MST
 f6d0aecaf27b45e31e11493394719fc7c23f649f128498284fcb56585152c8e7  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 78b782faf43a24cafdfebd6b98eaf7ec7471b78d797dddee75d3ae20bfcf16dd  .claude/skills/wrap-up/SKILL.md
 6f6dd91de6d1e5c91b66d5c6dd5a14f46a6fe05a15977ee3a1e5dc63fa2684a4  .claude/skills/checkpoint/guides/CHECKPOINT_GUIDE.md
@@ -14,12 +14,12 @@ ad65840cdc2f57a8f8f96abf517641e077dbdd1dd9f69ec7ff954963c36b129e  .claude/skills
 ebb493143bcb093efe08faf962a0e422e85bea51e61dfbf7ec8c47005de40566  .claude/commands/init-project.md
 ff6e92098f1fd6d4d901e5c8dbe25d08a5455b1947d280f422cf8112594d7eb7  .claude/commands/resume.md
 733c8403fa375ca8c2fd1d6f7cf32c61d247ba23dc548ec1f95a15a4156fc852  .claude/commands/ship.md
-3a4b89a41e25b2ba4dd0d775995fb4e00678e808a069514f491bec25d6f52f01  .claude/commands/bug.md
+91a368a5d15f8132e444023ce82650696ef9eb0545f943e2ff1dd7f12dfc375b  .claude/commands/bug.md
 5fdc0b846d9d556313cbf1f9785f6f8a93b7081c66450db38c6f0fae568b19a3  .claude/commands/file-bug.md
 0922a92fef26604cd676c5b521ba8c0116435caf68934940e69dabe305c3038c  .claude/commands/build-timer-note.md
 c62deaa5717735e44813f839a631b2c73228e5e95447e904044ee15b5772e221  .claude/commands/meeting-reconcile.md
 a6ffec9d537280206693c5476655c7a48e8508dae86976dbb832a9112e6477d8  .claude/guides/doc-style-reference.md
-6b636e6095687b24403eb8006d98f7ca6194a80451c49a023557bd04663bccf6  .claude/guides/bug-report-style.md
+08a4830f554a14eb52f87753b2e771cd898e5af3fa7873b95a36e21e727bae9b  .claude/guides/bug-report-style.md
 c50261620cb3ab32c425e35bf5e85169a771f7f830d737ea57bf42bf17c568aa  .claude/scripts/link-doc-refs.py
 04aef5758abaeca91bb5b3aa0907a4e6607c523a46001f99fb6bd8350173a380  .claude/scripts/reflow-md.py
 b485dfa0921abcc032fc04aec1e82bde4e8637ed86def76c104eea66bfb87d7e  .github/ISSUE_TEMPLATE/bug_report.yml
