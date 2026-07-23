@@ -32,7 +32,7 @@ This is a step, not a suggestion. Checkpoint *appends* to docs it does not verif
 
 ### Step 1 — Update docs (BEFORE any commit/push)
 
-**Timestamp source:** every stamp these docs get — the `CURRENT_STATUS.md` and `NEXT_STEPS.md` `**Last updated:** YYYY-MM-DD HH:MM TZ` headers, LESSONS `**Date:**` lines, Recently-Closed and `✅ DONE` marks — comes verbatim from `date "+%Y-%m-%d %H:%M %Z"`. Never guess the time or zone. The `CURRENT_STATUS.md` header must be a single `**Last updated:**` line in exactly this shape as the first non-heading line, because `/resume` reads and echoes it back verbatim.
+**Timestamp source:** every stamp these docs get — the `CURRENT_STATUS.md` and `NEXT_STEPS.md` `**Last updated:** YYYY-MM-DD HH:MM TZ` headers, LESSONS `**Date:**` lines, archived next-step entries and `✅ DONE` marks — comes verbatim from `date "+%Y-%m-%d %H:%M %Z"`. Never guess the time or zone. The `CURRENT_STATUS.md` header must be a single `**Last updated:**` line in exactly this shape as the first non-heading line, because `/resume` reads and echoes it back verbatim.
 
 Update these files in the project's `docs/` folder:
 
@@ -103,8 +103,28 @@ Stage ALL changes (code + docs) into a single commit, then push. Never commit co
 [Gotchas, blockers, or context that matters. Omit section if none.]
 ```
 
+### Archive closed items — keep NEXT_STEPS.md to live work only
+
+`NEXT_STEPS.md` holds **only real, unsolved next steps**. When an item is confirmed **done**, **abandoned**, or **superseded** (overridden by a new finding or decision), do not leave it in the file and do not silently delete it — **move it out** to the archive:
+
+```
+<DOCS>/history/NEXT_STEPS-archive.md
+```
+
+Create the file (and `<DOCS>/history/`) if it doesn't exist yet. It is **append-only, newest block on top**, and grows without limit — it never gets rewritten or pruned. `doc-reconcile` skips `history/` and `-archive` files, so nothing there trips rot detection. Append under a stamp taken verbatim from `date "+%Y-%m-%d %H:%M %Z"`:
+
+```markdown
+## YYYY-MM-DD HH:MM TZ
+- ✅ **Done** — <item> — <one-line outcome>
+- 🚫 **Abandoned** — <item> — <why it was dropped>
+- ↪️ **Superseded** — <item> — overridden by <DEC-NNN / decision>
+```
+
+This is the NEXT_STEPS analog of how CURRENT_STATUS prunes: CURRENT_STATUS is a snapshot that drops completed items (their record lives on in CHANGELOG); NEXT_STEPS moves them to this archive. Either way the live file stays lean and closed items stay recoverable. **Never a "Recently Closed" pile inside NEXT_STEPS.md** — that overflow belongs in the archive.
+
 ### Key Distinctions
-- **NEXT_STEPS.md** = "start here next session" (replaces itself each closeout)
+- **NEXT_STEPS.md** = "start here next session" — live items only; closed ones move to `history/NEXT_STEPS-archive.md`
+- **history/NEXT_STEPS-archive.md** = every next-step item ever closed (append-only history)
 - **TODOS.md** = full backlog of tasks across the project (accumulates)
 - **CURRENT_STATUS.md** = high-level project state (snapshot)
 

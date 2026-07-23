@@ -57,9 +57,9 @@ Create `docs/` directory if it doesn't exist.
 - Annotate abandoned items (don't silently delete) and add any new TODOs discovered
 - Keep the Active/Backlog/Completed structure
 
-**NEXT_STEPS.md** — reconcile it to reality (this drifts fastest):
+**NEXT_STEPS.md** — reconcile it to reality (this drifts fastest); keep it to **live work only**:
 - Refresh "Where We Left Off" with this session's shipped work
-- For any "Pick Up Here" / open item now **done or abandoned**, move it to a "Recently Closed" note with today's date **and time** — don't just delete it
+- For any "Pick Up Here" / open item now **done, abandoned, or superseded**, **move it out** of NEXT_STEPS.md into `docs/history/NEXT_STEPS-archive.md` (create the file and `history/` folder if missing) — don't leave it here and don't silently delete it. Append it under a `## {TODAY'S DATE + TIME}` block with its outcome (`✅ Done` / `🚫 Abandoned` / `↪️ Superseded by …`). The archive is append-only and grows freely; `doc-reconcile` skips it. **Never keep a "Recently Closed" pile inside NEXT_STEPS.md** — that overflow lives in the archive.
 - Add follow-ups the session's work spawned
 - Bump the "Last updated" date **and time** + session number
 

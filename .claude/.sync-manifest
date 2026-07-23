@@ -1,20 +1,23 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-07-21 23:13 MST
+# Last synced: 2026-07-23 12:37 MST
 f6d0aecaf27b45e31e11493394719fc7c23f649f128498284fcb56585152c8e7  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
-c6552a9ff0750ad489cbdf500fddc577f32d8852d07caab3f8ab80b5e7e47531  .claude/skills/wrap-up/SKILL.md
+78b782faf43a24cafdfebd6b98eaf7ec7471b78d797dddee75d3ae20bfcf16dd  .claude/skills/wrap-up/SKILL.md
 6f6dd91de6d1e5c91b66d5c6dd5a14f46a6fe05a15977ee3a1e5dc63fa2684a4  .claude/skills/checkpoint/guides/CHECKPOINT_GUIDE.md
-5a27d9faad8c74d344368a1952007eeaf62efe61ee5e56b78e08d410f9be0b6a  .claude/skills/checkpoint/SKILL.md
+663b5fd13adbda0e99d09fa7190ec68377de17645517c2f31207df16176c3246  .claude/skills/checkpoint/SKILL.md
 54d3b33f9ceebd2a6b87662bf75561c52d917a5c3a801f2cd44dd829d5951708  .claude/skills/next-step/SKILL.md
 ad65840cdc2f57a8f8f96abf517641e077dbdd1dd9f69ec7ff954963c36b129e  .claude/skills/doc-reconcile/SKILL.md
-a887aecefc0c992e10cca44d8150c99f92402d2b6fc59bc00784ebf8a5a80dfe  .claude/skills/doc-reconcile/scripts/check-doc-refs.py
-9fbd19a57152951520402bae8d2ef5cba0cb456ff7adac1ec59580ffba4ccac0  .claude/commands/checkpoint.md
-2f766a880902a889e522853dc74a964c5b06ca72527b29f9d2003f940d293976  .claude/commands/init-project.md
+3a171f29031413762c01cae2ac9c15fb5734428d9660cdd035d5edba94635c2e  .claude/skills/doc-reconcile/scripts/check-doc-refs.py
+831a32f76a8f721b8585a2597c1597e4dafa7e4a52c01adb93e10b65f060f86d  .claude/skills/meeting-reconcile/guides/reconciliation-note-format.md
+8166696a291cf803fbcf7f7e3886f52ba897a9dbca307ba4468e60ec73162216  .claude/skills/meeting-reconcile/SKILL.md
+4b6b3392780957226b0a25db9e4d33f46400ce9c36b37d7a26969523e90212ea  .claude/commands/checkpoint.md
+ebb493143bcb093efe08faf962a0e422e85bea51e61dfbf7ec8c47005de40566  .claude/commands/init-project.md
 ff6e92098f1fd6d4d901e5c8dbe25d08a5455b1947d280f422cf8112594d7eb7  .claude/commands/resume.md
 733c8403fa375ca8c2fd1d6f7cf32c61d247ba23dc548ec1f95a15a4156fc852  .claude/commands/ship.md
 3a4b89a41e25b2ba4dd0d775995fb4e00678e808a069514f491bec25d6f52f01  .claude/commands/bug.md
 5fdc0b846d9d556313cbf1f9785f6f8a93b7081c66450db38c6f0fae568b19a3  .claude/commands/file-bug.md
 0922a92fef26604cd676c5b521ba8c0116435caf68934940e69dabe305c3038c  .claude/commands/build-timer-note.md
+c62deaa5717735e44813f839a631b2c73228e5e95447e904044ee15b5772e221  .claude/commands/meeting-reconcile.md
 a6ffec9d537280206693c5476655c7a48e8508dae86976dbb832a9112e6477d8  .claude/guides/doc-style-reference.md
 6b636e6095687b24403eb8006d98f7ca6194a80451c49a023557bd04663bccf6  .claude/guides/bug-report-style.md
 c50261620cb3ab32c425e35bf5e85169a771f7f830d737ea57bf42bf17c568aa  .claude/scripts/link-doc-refs.py

@@ -83,7 +83,7 @@ where it's cheap, ship.
 
 | File | What "reconciled" means |
 |------|-------------------------|
-| **`<DOCS>/NEXT_STEPS.md`** | The pick-up point. Any "Pick Up Here" item this work **closed or abandoned** moves to **Recently Closed** with today's absolute date, time **and timezone** (`YYYY-MM-DD HH:MM TZ`, e.g. `2026-07-14 19:46 MST`) and the outcome. Add follow-ups the work spawned. **Never silently delete an item.** |
+| **`<DOCS>/NEXT_STEPS.md`** | The pick-up point — **live work only**. Any "Pick Up Here" item this work **closed, abandoned, or superseded** moves **out** to `<DOCS>/history/NEXT_STEPS-archive.md` (create the file/`history/` folder if missing), appended under a `## YYYY-MM-DD HH:MM TZ` block with the outcome (`✅ Done` / `🚫 Abandoned` / `↪️ Superseded by …`). Add follow-ups the work spawned. **Never silently delete an item, and never leave a "Recently Closed" pile in NEXT_STEPS.md** — the archive is append-only, grows freely, and `doc-reconcile` skips it. |
 | **`<DOCS>/CURRENT_STATUS.md`** | Append/extend the session record: what happened, what was decided, what is now true that wasn't before. |
 | **`<DOCS>/TODOS.md`** | Mark shipped items `~~struck~~ ✅ DONE <YYYY-MM-DD HH:MM TZ>`; annotate abandoned ones. A shipped feature must not stay invisible in the tracking docs. |
 | **`<DOCS>/DECISIONS.md`** | If this work settled, reversed, or scoped a decision, append it dated — with the **why**, not just the what. Where a project treats this as its constitution it outranks every other doc; match its existing entry format exactly. |
@@ -213,13 +213,14 @@ No `origin` remote → say so and stop. Don't invent one.
 - **Read before editing** — match existing tone, structure, and entry format.
 - **Don't fabricate** changelog or decision entries for things not in the diff.
 - **Convert relative dates to absolute, and always include the time and timezone** (`YYYY-MM-DD HH:MM TZ`, e.g. `2026-07-14 19:46 MST`). Two developers work across zones (Arizona MST, Pakistan PKT) and ship the same day — a bare date can't tell two updates apart, and a bare time can't be compared across zones. The TZ is what orders them.
-  **This rule OVERRIDES "match existing entry format."** When the surrounding doc uses date-only stamps, add the time and TZ to *new and touched* entries anyway — do not retrofit historical entries. It applies to every stamp this skill writes: `**Last updated:**` header lines, `_Last updated … by an AI session_` traceability lines, session-summary headings in CURRENT_STATUS, new DECISIONS entries and dated blocks, LESSONS_LEARNED entry headings, Recently Closed items, and TODO strike-throughs. Get the time from the machine's own clock with `date "+%Y-%m-%d %H:%M %Z"` — this stamps the writer's local zone (`MST` in Arizona, `PKT` in Pakistan), never guess it. If the exact event time isn't known, stamp the wrap-up time rather than inventing one.
+  **This rule OVERRIDES "match existing entry format."** When the surrounding doc uses date-only stamps, add the time and TZ to *new and touched* entries anyway — do not retrofit historical entries. It applies to every stamp this skill writes: `**Last updated:**` header lines, `_Last updated … by an AI session_` traceability lines, session-summary headings in CURRENT_STATUS, new DECISIONS entries and dated blocks, LESSONS_LEARNED entry headings, archived next-step entries, and TODO strike-throughs. Get the time from the machine's own clock with `date "+%Y-%m-%d %H:%M %Z"` — this stamps the writer's local zone (`MST` in Arizona, `PKT` in Pakistan), never guess it. If the exact event time isn't known, stamp the wrap-up time rather than inventing one.
 - **Archive, never `rm -rf`** — per global file-deletion safety.
 - **Never move DB migrations into `archive/` yourself** — that move is the user's "I
   applied it" signal. Leave new migrations at top level and flag them pending. Verify
   live DB state before claiming a migration is in effect.
-- **Don't rewrite historical or archive docs** (`intake/`, `discovery/`, meeting briefs,
-  frozen predecessor records). Superseding them is correct; editing them to match the
-  present falsifies the record. Add a dated banner pointing forward instead.
+- **Don't rewrite historical or archive docs** (`history/`, `intake/`, `discovery/`, meeting
+  briefs, frozen predecessor records). Superseding them is correct; editing them to match the
+  present falsifies the record. Add a dated banner pointing forward instead. `history/NEXT_STEPS-archive.md`
+  is **append-only** — add new closed items to the top, never revise what's already there.
 
 See `guides/WRAP_UP_GUIDE.md` for examples and tips.

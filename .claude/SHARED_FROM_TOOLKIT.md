@@ -12,5 +12,5 @@ the bug-report Issue Form.
 detects it, refuses to overwrite it, and asks for it to be back-ported. That protects the
 work, but it also stalls the sync — so make the change in the toolkit in the first place.
 
-Managed items: skills = wrap-up checkpoint next-step doc-reconcile; commands = checkpoint init-project resume ship bug file-bug build-timer-note; guides = doc-style-reference.md bug-report-style.md; scripts = link-doc-refs.py reflow-md.py; github = bug_report.yml config.yml.
-Last synced: 2026-07-21 23:13 MST
+Managed items: skills = wrap-up checkpoint next-step doc-reconcile meeting-reconcile; commands = checkpoint init-project resume ship bug file-bug build-timer-note meeting-reconcile; guides = doc-style-reference.md bug-report-style.md; scripts = link-doc-refs.py reflow-md.py; github = bug_report.yml config.yml.
+Last synced: 2026-07-23 12:37 MST

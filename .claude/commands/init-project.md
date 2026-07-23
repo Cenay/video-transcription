@@ -30,6 +30,7 @@ Create the following directories (skip any that already exist):
 .claude/
 .claude/skills/
 <DOCS>/
+<DOCS>/history/
 plans/
 ```
 
@@ -47,6 +48,12 @@ Create the following files **only if they don't already exist** (never overwrite
 | `<DOCS>/DECISIONS.md` | Dated decision ledger — the project's constitution |
 | `<DOCS>/LESSONS_LEARNED.md` | Gotchas and insights discovered while working |
 | `README.md` (root) | What the project is, for a human |
+
+Plus one companion file — the overflow for closed next-steps, so `NEXT_STEPS.md` stays lean:
+
+| File | Purpose |
+|------|---------|
+| `<DOCS>/history/NEXT_STEPS-archive.md` | Where done/abandoned/superseded next-step items go; append-only, grows freely |
 
 These are the same files `/wrap-up` reconciles on every commit. If a project already
 uses a variant name (`TODO.md`, `todos/`), **use what's there — do not create a second one.**
@@ -210,11 +217,29 @@ This file provides guidance to Claude Code when working in this repository.
 ## Blocked / Waiting On
 
 <!-- What's stuck, and on whom or what -->
+```
 
-## Recently Closed
+> **Keep this file to live work only.** When an item is done, abandoned, or superseded,
+> **move it out** to `<DOCS>/history/NEXT_STEPS-archive.md` (never silently delete it) —
+> `/checkpoint` and `/wrap-up` do this automatically. This file should never grow a
+> "Recently Closed" pile; the archive is where closed items live.
 
-<!-- Items moved off "Pick Up Here" — with the date, time and timezone (YYYY-MM-DD HH:MM TZ) and the outcome.
-     Never silently delete a closed item; a reader needs to know it was decided. -->
+### <DOCS>/history/NEXT_STEPS-archive.md
+
+```markdown
+# Next Steps — Archive — {PROJECT_NAME}
+
+> Closed, abandoned, and superseded next-step items, moved out of `NEXT_STEPS.md` so it
+> holds only live work. **Append-only, newest first — never rewritten.** `doc-reconcile`
+> skips this file (it lives under `history/`), so it can grow without limit.
+
+<!-- Format — group by the closeout stamp (YYYY-MM-DD HH:MM TZ), newest block on top:
+
+## YYYY-MM-DD HH:MM TZ
+- ✅ **Done** — <item> — <one-line outcome>
+- 🚫 **Abandoned** — <item> — <why it was dropped>
+- ↪️ **Superseded** — <item> — overridden by <DEC-NNN / decision>
+-->
 ```
 
 ### <DOCS>/DECISIONS.md
@@ -337,10 +362,12 @@ Show a tree-style summary of what was created:
 ├── README.md
 ├── <DOCS>/                  # docs/ under /mnt/k/Code — .cloaked/docs/ on client sites
 │   ├── CURRENT_STATUS.md
-│   ├── NEXT_STEPS.md        # ← the session entry point
+│   ├── NEXT_STEPS.md        # ← the session entry point (live work only)
 │   ├── TODOS.md
 │   ├── DECISIONS.md
-│   └── LESSONS_LEARNED.md
+│   ├── LESSONS_LEARNED.md
+│   └── history/
+│       └── NEXT_STEPS-archive.md   # closed next-steps overflow
 └── plans/
 ```
 

@@ -263,12 +263,40 @@ def check_doc_files(roots, docs):
 
     # References to sibling docs that aren't there.
     ref_re = re.compile(r'`([\w./-]*(?:docs|specs|plans)/[\w./-]+\.md)`')
-    missing = {}
+
+    # SHALLOW ESCAPE HATCH for the cross-repo false positive — a doc that documents
+    # ANOTHER repo's file layout (e.g. what `/bug` writes into target repos), or names a
+    # file it plans to create. Two forms, both HTML comments so they render invisibly:
+    #   <!-- doc-reconcile: ignore-missing docs/X.md docs/Y.md -->
+    #        SCAN-GLOBAL allowlist. Declared in ANY scanned doc; those exact refs are
+    #        never reported missing anywhere. Use for a path referenced across many docs.
+    #   <!-- doc-reconcile: ignore -->
+    #        LINE-SCOPED. Skips MISSING_DOC for refs on the line it sits on.
+    # This is deliberately shallow; the deep fix is real cross-repo path awareness
+    # (resolve against a repo map / skip known-repo prefixes) — tracked in the toolkit's
+    # docs/TODOS.md under "doc-reconcile follow-ups". `ignore\s*-->` cannot match
+    # `ignore-missing …` (the hyphen breaks it), so the two forms don't collide.
+    ignore_missing_re = re.compile(r'<!--\s*doc-reconcile:\s*ignore-missing\s+([^>]*?)\s*-->')
+    ignore_line_re = re.compile(r'<!--\s*doc-reconcile:\s*ignore\s*-->')
+
+    # Pass 1: collect the scan-global allowlist declared anywhere.
+    allow_missing = set()
+    doc_lines = {}
     for doc in docs:
         with open(doc, encoding='utf-8') as fh:
-            lines = fh.readlines()
-        for lineno, line in strip_fences(lines):
+            doc_lines[doc] = fh.readlines()
+        for m in ignore_missing_re.finditer(''.join(doc_lines[doc])):
+            for tok in m.group(1).split():
+                allow_missing.add(os.path.normpath(tok))
+
+    missing = {}
+    for doc in docs:
+        for lineno, line in strip_fences(doc_lines[doc]):
+            if ignore_line_re.search(line):
+                continue
             for ref in ref_re.findall(line):
+                if os.path.normpath(ref) in allow_missing:
+                    continue
                 # Resolve against: cwd, the citing doc's folder, and the repo's PARENT
                 # (sibling-repo citations like `migration/docs/x.md` are normal in a
                 # monorepo-adjacent layout and must not be reported as missing).
