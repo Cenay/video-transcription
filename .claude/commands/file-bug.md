@@ -69,7 +69,7 @@ surface, when-found from `date`. Ask only about what you truly cannot deduce.
 | **Severity** | Critical / High / Medium / Low — about *consequence*, not fix difficulty. |
 | **File and line** | `path/to/File.ext:LINE`, repo-root-relative, line **verified**. `N/A (…)` for infra. |
 | **Function / method** | Survives line drift. `N/A` for config/infra. |
-| **Found by** | Model+surface (`Claude Opus 4.8 (Terminal)`) or a person. `unknown` if truly unknown. |
+| **Found by** | Model+surface for the model that actually ran — name it, never copy a version from this table (e.g. `Claude Opus 5 (Terminal)`) — or a person. `unknown` if truly unknown. |
 | **When found** | `YYYY-MM-DD HH:MM ZZ` — get it from the machine: `date "+%Y-%m-%d %H:%M %Z"`. TZ is mandatory. |
 | **Symptom / Cause / Reproduce / Expected / Actual / Suggested fix** | Prose sections; Cause quotes the offending lines with `// line N`. |
 | **Transcript** | The `.jsonl` session ID under `~/.claude/projects/`. Omit if unavailable — never invent. |
@@ -91,7 +91,7 @@ gh issue create \
 > **Status:** Open · **Lane:** <Confirmed|Suspected> · **Severity:** <High>
 > **File:** `path/to/File.ext:118`
 > **Function:** `someFunction()`
-> **Found by:** <Claude Opus 4.8 (Terminal)> · <2026-07-16 18:27 MST>
+> **Found by:** <the model that actually ran + its surface, e.g. Claude Opus 5 (Terminal)> · <2026-07-16 18:27 MST>
 > **Transcript:** `<session-id>`
 
 **Symptom:** …

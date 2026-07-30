@@ -55,8 +55,10 @@ Plus one companion file — the overflow for closed next-steps, so `NEXT_STEPS.m
 |------|---------|
 | `<DOCS>/history/NEXT_STEPS-archive.md` | Where done/abandoned/superseded next-step items go; append-only, grows freely |
 
-These are the same files `/wrap-up` reconciles on every commit. If a project already
-uses a variant name (`TODO.md`, `todos/`), **use what's there — do not create a second one.**
+These are the **standard doc set**. They have a **single writer**, who maintains them via
+`/checkpoint`; `/wrap-up` and `/ship` commit code and deliberately do not write them. If a
+project already uses a variant name (`TODO.md`, `todos/`), **use what's there — do not
+create a second one.**
 
 **Timestamp convention:** every `{TODAY'S DATE + TIME}` below is `YYYY-MM-DD HH:MM TZ` — 24-hour
 time plus a timezone abbreviation (e.g. `2026-07-14 19:46 MST`, `2026-07-15 07:46 PKT`). Always
@@ -220,9 +222,10 @@ This file provides guidance to Claude Code when working in this repository.
 ```
 
 > **Keep this file to live work only.** When an item is done, abandoned, or superseded,
-> **move it out** to `<DOCS>/history/NEXT_STEPS-archive.md` (never silently delete it) —
-> `/checkpoint` and `/wrap-up` do this automatically. This file should never grow a
-> "Recently Closed" pile; the archive is where closed items live.
+> **move it out** to `<DOCS>/history/NEXT_STEPS-archive.md` (never silently delete it).
+> This file should never grow a "Recently Closed" pile; the archive is where closed items
+> live. The doc set has a **single writer** who does this move as part of their session
+> save — if that isn't you, note the closed item in your PR body instead of editing here.
 
 ### <DOCS>/history/NEXT_STEPS-archive.md
 
@@ -230,8 +233,8 @@ This file provides guidance to Claude Code when working in this repository.
 # Next Steps — Archive — {PROJECT_NAME}
 
 > Closed, abandoned, and superseded next-step items, moved out of `NEXT_STEPS.md` so it
-> holds only live work. **Append-only, newest first — never rewritten.** `doc-reconcile`
-> skips this file (it lives under `history/`), so it can grow without limit.
+> holds only live work. **Append-only, newest first — never rewritten.** Doc-reconciliation
+> tooling skips this file (it lives under `history/`), so it can grow without limit.
 
 <!-- Format — group by the closeout stamp (YYYY-MM-DD HH:MM TZ), newest block on top:
 
@@ -375,11 +378,17 @@ Show a tree-style summary of what was created:
 existing project: nothing is ever overwritten. If a doc already exists under a variant
 name, say so rather than creating a duplicate alongside it.
 
-These five docs + the root README are exactly what `/wrap-up` reconciles on every
-commit — that's the contract between the two commands.
+These five docs + the root README are the **standard doc set**. The per-file contract —
+what each one must contain and what "reconciled" means for it — lives in the
+`doc-reconcile` skill under *"The standard doc set"*. This command scaffolds that set;
+the project's single doc writer maintains it. `/wrap-up` and `/ship` deliberately do
+**not** write these files.
 
 Remind the user of these companion commands:
-- `/audit-claude-md` — Improve your CLAUDE.md as the project takes shape
-- `/checkpoint` — Save session state before closing out
 - `/resume` — Pick up where you left off next session
-- `/cross-search` — Find implementations across all your projects
+- `/ship` — Commit and push the current branch
+- `/wrap-up` — Same, with the diff summarized back to you first
+- `/bug` or `/file-bug` — File a defect into the ledger, or as a GitHub Issue
+
+> Some toolkit commands (`/checkpoint`, `/audit-claude-md`, `/cross-search`) are not
+> distributed to project repos — don't offer them unless they resolve in this session.

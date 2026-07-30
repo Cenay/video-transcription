@@ -47,7 +47,7 @@ Each bug is an H2 heading, followed by a blockquote of key facts, followed by pr
 > **Status:** Open · **Severity:** High
 > **File:** `path/to/SomeFile.ext:118` (relative to repo root)
 > **Symbol:** `someFunction()` / `SomeClass::someMethod()`
-> **Found by:** Claude Opus 4.8 (Terminal) · 2026-07-14 14:30 ET
+> **Found by:** Claude Opus 5 (Terminal) · 2026-07-14 14:30 ET
 > **Transcript:** `a54150ad-e72d-412b-8b27-c756543bb277`
 > **Related doc:** `docs/SomeComponent.md` (Issue 3) — omit if none
 
@@ -103,14 +103,14 @@ Severity is about **consequence**, not about how easy the fix is.
 
 ### Found by
 
-Name the model and surface: `Claude Opus 4.8 (Terminal)`. If a human found it, name them. If provenance is unknown, write `unknown` — **never guess**. Follow the name with the date **and time** the bug was found (see below).
+Name the model that actually ran, plus its surface — e.g. `Claude Opus 5 (Terminal)`. **Name the running model; never copy a version out of this guide.** The examples here are illustrative and go stale; a version copied from them attributes the find to a model that never ran. If a human found it, name them. If provenance is unknown, write `unknown` — **never guess**. Follow the name with the date **and time** the bug was found (see below).
 
 ### Date and time — always include a timezone
 
 > **Format:** `YYYY-MM-DD HH:MM ZZ` — e.g. `2026-07-16 14:30 ET`.
 
 - Every bug records **when** it was found, not just the day. Use a 24-hour clock and **always** name the timezone (`ET`, `CT`, `PT`, `MST`, …) — a timestamp with no zone is ambiguous and forbidden here.
-- The time belongs on the **Found by** line, immediately after the date: `**Found by:** Claude Opus 4.8 (Terminal) · 2026-07-16 14:30 ET`.
+- The time belongs on the **Found by** line, immediately after the date: `**Found by:** Claude Opus 5 (Terminal) · 2026-07-16 14:30 ET`.
 - The **ID** still uses the date only (`BUG-YYYY-MM-DD-NNN`); the counter already disambiguates multiple bugs found the same day.
 - Use the timezone the work actually happened in. Get it from the machine's own clock (`date "+%Y-%m-%d %H:%M %Z"`) — do not guess or convert. If you don't know the zone, ask rather than inventing one.
 
@@ -130,7 +130,7 @@ These live under the ledger's `## Suspected / Needs Investigation` section (H2, 
 > **Status:** Suspected · **Certainty:** Low
 > **Suspected severity (if real):** High
 > **Suspected location:** `path/to/File.ext:~120` (unverified — best guess) · `someFunction()`
-> **Raised by:** Claude Opus 4.8 (Terminal) · 2026-07-17 12:30 MST
+> **Raised by:** Claude Opus 5 (Terminal) · 2026-07-17 12:30 MST
 > **Transcript:** `<session-id>`   <!-- omit if unavailable -->
 
 **Why I suspect it:** The signal that prompted this — an error seen in the wild, a smell in the code, a user report. Be explicit about what is *observed* vs *inferred*.
