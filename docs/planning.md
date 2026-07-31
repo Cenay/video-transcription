@@ -56,4 +56,4 @@ and stripped before args reach `pipeline.py` (argparse would reject it).
 - [ ] TRFA dual-Notion routing — Art's Teamspace needs its own Notion integration (separate workspace, separate API key). Currently all pages go to Cenay's Notion.
 - [ ] ExpanDrive doesn't refresh Nautilus view after `aws s3 cp` uploads — cosmetic issue, files are confirmed in S3
 
-> **Quality-of-life backlog:** smaller polish items live in [`todos/qol-improvements.md`](../todos/qol-improvements.md).
+> **Quality-of-life backlog:** smaller polish items live in [`TODOS.md`](TODOS.md).

@@ -70,3 +70,6 @@ temp/*
 !output/.gitkeep
 !temp/.gitkeep
 !logs/.gitkeep
+
+# Local recovery archive (safe-delete staging) — never commit
+.archived/
