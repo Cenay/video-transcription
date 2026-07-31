@@ -7,9 +7,7 @@ You are resuming work on the current project. Give the user a fast, actionable b
 
 ## Step 1: Check freshness FIRST — before reading a single doc
 
-**The docs you are about to read have a single writer, and that writer's latest work may
-only exist on `origin`.** Briefing off stale local docs is worse than not briefing: it
-reports last week's state with today's confidence.
+**The docs you are about to read have a single writer, and that writer's latest work may only exist on `origin`.** Briefing off stale local docs is worse than not briefing: it reports last week's state with today's confidence.
 
 ```bash
 git fetch --quiet origin 2>/dev/null
@@ -17,21 +15,29 @@ git status -sb                                    # ahead/behind on the tracked 
 git log --oneline HEAD..@{upstream} 2>/dev/null    # what you don't have yet
 ```
 
-- **Behind `origin`?** Say so **at the top of the briefing, prominently** — how many
-  commits, and whether any of them touch the doc set. Then **recommend** `git pull`:
+- **Behind `origin`?** Say so **at the top of the briefing, prominently** — how many commits, and whether any of them touch the doc set. Then **recommend** `git pull`:
 
   > ⚠️ **You are 4 commits behind `origin/main`, and 2 of them touch `docs/`. Run `git pull` before starting — this briefing is from your local copy.**
 
-- **Do NOT pull automatically.** A command that mutates the working tree on invocation is
-  a surprise, and an auto-pull during a dirty tree or a half-finished rebase fails badly.
-  Report and recommend; let the user run it.
-- **No upstream, no `origin`, or fetch fails?** Note it in one line and continue. A
-  freshness check that can't run must never block the briefing.
+- **Do NOT pull automatically.** A command that mutates the working tree on invocation is a surprise, and an auto-pull during a dirty tree or a half-finished rebase fails badly. Report and recommend; let the user run it.
+- **No upstream, no `origin`, or fetch fails?** Note it in one line and continue. A freshness check that can't run must never block the briefing.
+
+## Step 1b: Check whether anyone is waiting on your review
+
+A blocked PR is a **teammate stuck**, not a tidy-up task. On repos with branch protection, a pull request that needs your approval sits there doing nothing until you look — and the person who opened it can't merge past it. Surface that at the same moment the user is choosing what to work on.
+
+```bash
+gh pr status 2>/dev/null      # "Requesting a code review from you" section, this repo
+```
+
+- **Any PRs awaiting this user's review?** Say so in the briefing, with the number, title and author — and put it **above** the next-steps list. Someone else's blocked work usually outranks your own backlog.
+- **Widen the net only if asked** — `gh search prs --review-requested=@me --state=open` covers every repo, which is useful at the start of a day but noisy inside a single project's briefing.
+- **`gh` missing, not authenticated, no network, or the call errors?** One line, or stay silent, and continue. Same rule as the freshness check: **this must never block the briefing**, and it must never be the reason a `/resume` feels slow. It is a courtesy check, not a gate.
+- **Nothing pending?** Say nothing at all. An empty review queue is not news.
 
 ## Step 2: Load Context
 
-Read the following files (skip any that don't exist). `<DOCS>` is `docs/` for projects
-under `/mnt/k/Code/`, or `.cloaked/docs/` for client sites under `/mnt/k/_Sites/`:
+Read the following files (skip any that don't exist). `<DOCS>` is `docs/` for projects under `/mnt/k/Code/`, or `.cloaked/docs/` for client sites under `/mnt/k/_Sites/`:
 
 1. `CLAUDE.md` — project overview and conventions
 2. `<DOCS>/CURRENT_STATUS.md` — where we left off
@@ -43,17 +49,17 @@ under `/mnt/k/Code/`, or `.cloaked/docs/` for client sites under `/mnt/k/_Sites/
 
 ## Step 3: Deliver Briefing
 
-Present a dense, actionable briefing. No fluff. Lead with the freshness warning from step 1
-if there was one. Use this format:
+Present a dense, actionable briefing. No fluff. Lead with the freshness warning from step 1 if there was one, then the review queue from step 1b if it wasn't empty. Use this format:
 
 ---
 
 **{PROJECT_NAME}** | Last checkpoint: {copy the `**Last updated:**` line's stamp from CURRENT_STATUS.md verbatim — the full `YYYY-MM-DD HH:MM TZ`, not just the date}
 
+**⏳ Waiting on your review:** {From step 1b — `#<number> <title> (@<author>)`, one line each. **Omit this line entirely when the queue is empty.**}
+
 **Where we left off:** {1-2 sentences from CURRENT_STATUS.md "In Progress" and "Session Summary"}
 
-**Next steps:**
-{Numbered list from CURRENT_STATUS.md "Next Steps", prioritized}
+**Next steps:** {Numbered list from CURRENT_STATUS.md "Next Steps", prioritized}
 
 **Open TODO(s):** {Count from docs/TODO(S).md Active section, list top 3}
 
@@ -75,19 +81,10 @@ Do NOT summarize the entire CLAUDE.md. Do NOT explain the tech stack unless aske
 
 ## Why the "Last checkpoint" stamp can look old — and why that is correct
 
-`**Last updated:**` in `CURRENT_STATUS.md` is written by the doc set's **single writer**,
-during their session save. `/ship` and `/wrap-up` deliberately do not touch it. So after a
-stretch of commit-and-push work, the stamp will trail the newest commit — sometimes by
-days.
+`**Last updated:**` in `CURRENT_STATUS.md` is written by the doc set's **single writer**, during their session save. `/ship` and `/wrap-up` deliberately do not touch it. So after a stretch of commit-and-push work, the stamp will trail the newest commit — sometimes by days.
 
-**That is the intended semantics, not a bug.** The stamp answers "when did the writer last
-record where things stand?", not "when was this repo last touched." Report it verbatim and
-don't editorialize. If the gap is large and looks material, the honest move is one line
-noting the stamp is older than the recent commits — never to guess at a newer state or to
-write the header yourself.
+**That is the intended semantics, not a bug.** The stamp answers "when did the writer last record where things stand?", not "when was this repo last touched." Report it verbatim and don't editorialize. If the gap is large and looks material, the honest move is one line noting the stamp is older than the recent commits — never to guess at a newer state or to write the header yourself.
 
 ## This command only reads
 
-It does not pull, commit, write, or stamp anything. Its entire job is to load context and
-brief. If the briefing reveals that a doc is stale or wrong, **say so** — that flag goes to
-the single writer (or into your PR body); it is not yours to fix here.
+It does not pull, commit, write, or stamp anything. Its entire job is to load context and brief. If the briefing reveals that a doc is stale or wrong, **say so** — that flag goes to the single writer (or into your PR body); it is not yours to fix here.
