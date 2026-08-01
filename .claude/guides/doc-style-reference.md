@@ -28,6 +28,44 @@ This guide governs how documentation is written across projects, so that docs re
 
 Write each paragraph and list item as **one continuous physical line** and let editors soft-wrap. Do not hand-wrap prose at ~80/90 columns — hard breaks mid-sentence render as broken text and make diffs noisy. Hard breaks are structural only: lists, tables, code blocks, blockquotes. (Where the project ships `reflow-md.py`, it enforces this mechanically.)
 
+**Carve-out — the stamp chain is structural.** A run of dated session stamps is not one paragraph; it is a changelog of discrete records, the same category as a list. One stamp per line is correct there and does **not** violate the rule above. See the next section — and never "fix" a stamp fold by re-joining it into a single line.
+
+### The session-traceability stamp block
+
+Every long-lived doc (`CURRENT_STATUS`, `NEXT_STEPS`, `TODOS`, `DECISIONS`, `LESSONS_LEARNED`, and any doc a session materially rewrites) carries a stamp pointing back at the session that produced the change. Sessions **prepend** and **never delete** — so without a retention rule the stamp line grows without bound. Measured in `fran-dash` on 2026-07-31, before the fix: `DECISIONS.md`'s stamp line was **5,556 characters** holding 11 stamps, one of which had lost its `_` delimiter and was invisible to any reader or grep.
+
+The shape:
+
+```markdown
+# <Doc title>
+
+_Last updated YYYY-MM-DD HH:MM TZ by an AI session · <context> · transcript: `<session-id>` — <what changed>._
+
+<details>
+<summary>📜 <strong>Stamp history</strong> — the 3 previous updates (older ones: <code>history/&lt;DOC&gt;-stamp-history.md</code>)</summary>
+
+- _Prior: <stamp 1 verbatim>_
+- _Prior: <stamp 2 verbatim>_
+- _Prior: <stamp 3 verbatim>_
+
+</details>
+```
+
+Rules:
+
+- **The current stamp stays inline, bare, one line, unchanged in wording.** It is the only stamp read at load time, and `/resume` plus every existing grep target it exactly where it is today. Never move it into the fold.
+- **Priors are one bullet per line** inside the fold. Collapsed it is a single line of chrome; in raw Markdown a `grep` returns one stamp instead of a 5 KB blob, and a malformed entry is obvious on sight.
+- **The blank line after `<summary>` is required** — without it the bullets render as literal text.
+- **Retention: current + the 3 most recent priors.** Everything older moves verbatim, newest-first, to `history/<DOC>-stamp-history.md`. **Move, never delete** — the chain is load-bearing, and the roll-down file must exist before anything leaves the parent.
+- **Stamp text is never rewritten.** The only permitted edits are demoting the outgoing `_Last updated ` to `_Prior: `, and repairing a missing `_` delimiter.
+
+**Do not hand-edit this block.** `scripts/stamp-doc.py` does the whole prepend-then-fold-then-roll, converts legacy one-line blobs on first run, and refuses to write if any prior would be lost or duplicated:
+
+```bash
+python3 scripts/stamp-doc.py docs/DECISIONS.md --stamp "$(cat new-stamp.txt)"
+python3 scripts/stamp-doc.py docs/DECISIONS.md --check     # lint, never writes
+```
+
 ### Blockquotes for Reference Content
 
 Use blockquotes (`>`) for content that is meant to be referenced but not necessarily copied.

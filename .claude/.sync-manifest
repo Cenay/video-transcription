@@ -1,18 +1,19 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-07-30 20:25 MST
+# Last synced: 2026-08-01 01:13 MST
 e1fad792a169d0789d2b166a7d14cbab22a6adfbece64adb4b17f9b330951a68  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 c0e61ad160d419f0190134863f84a1cbbe655886d2ab828f1d4f508986a2a0ad  .claude/skills/wrap-up/SKILL.md
 54d3b33f9ceebd2a6b87662bf75561c52d917a5c3a801f2cd44dd829d5951708  .claude/skills/next-step/SKILL.md
-914227c8c996149ef93339bb93eca955a1b020f82119fd25387324b122102e31  .claude/commands/init-project.md
+fbe2ec7e8ddf8856b86b5ee87f00fbd0d33f6d4b1c05a3b0f59788c7a934b71d  .claude/commands/init-project.md
 319ad84f6ccd50709c7017433811b579e9a863d175e7785fa3c72b3f07390749  .claude/commands/resume.md
 9a50013b99d1b34cea0522c0c9250c8891213f736f3e113723f4d9850efba4e8  .claude/commands/ship.md
 91a368a5d15f8132e444023ce82650696ef9eb0545f943e2ff1dd7f12dfc375b  .claude/commands/bug.md
 7e897936e69dbfc62a5ad6c1a41e17629c1760bd7994e8d322859f0757aa22c7  .claude/commands/file-bug.md
 0922a92fef26604cd676c5b521ba8c0116435caf68934940e69dabe305c3038c  .claude/commands/build-timer-note.md
-a6ffec9d537280206693c5476655c7a48e8508dae86976dbb832a9112e6477d8  .claude/guides/doc-style-reference.md
+7d6fe50ae947402f89a28673b0367d5c6922f90fc1ff8c185f2d618193f2124e  .claude/guides/doc-style-reference.md
 d2dfa0dc81f743e626bfbc880c437a191e235656ac91d620ff75cd68a6c206f0  .claude/guides/bug-report-style.md
 c50261620cb3ab32c425e35bf5e85169a771f7f830d737ea57bf42bf17c568aa  .claude/scripts/link-doc-refs.py
-04aef5758abaeca91bb5b3aa0907a4e6607c523a46001f99fb6bd8350173a380  .claude/scripts/reflow-md.py
+19749afeb6e9f5bfe25598234fbb3bd71f9aacc8a71e1c6a5626e6a66d528945  .claude/scripts/reflow-md.py
+a3e1fe096a8140b5d71b127d5ff7f15f3a114c807fb417bd7751e9bda1bf5ca9  .claude/scripts/stamp-doc.py
 b485dfa0921abcc032fc04aec1e82bde4e8637ed86def76c104eea66bfb87d7e  .github/ISSUE_TEMPLATE/bug_report.yml
 4b5a0f7a5fbd0182f52030e9589a385533c906d0948c268be76efa433807923b  .github/ISSUE_TEMPLATE/config.yml
