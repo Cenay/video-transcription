@@ -31,8 +31,31 @@ Create the following directories (skip any that already exist):
 .claude/skills/
 <DOCS>/
 <DOCS>/history/
+<DOCS>/sessions/
+<DOCS>/sessions/history/
+<DOCS>/sessions/history/backups/
+<DOCS>/intake/
+<DOCS>/intake/meetings/
+<DOCS>/intake/prs/
 plans/
 ```
+
+| directory | who writes it | tracked? |
+|---|---|---|
+| `<DOCS>/history/` | `/checkpoint` — closed next-steps, rolled-down stamp blocks | ✅ tracked |
+| `<DOCS>/sessions/` | the `session-desk` skill — the live desk | ⛔ **excluded**, see below |
+| `<DOCS>/sessions/history/` | archived desks; `backups/` holds ad-hoc copies and is **not** listed by `/resume-session-desk` | ⛔ excluded |
+| `<DOCS>/intake/meetings/` | `meeting-reconcile` — meeting reconciliation notes | ⛔ **gitignored** |
+| `<DOCS>/intake/prs/` | `pr-reconcile` — PR harvest notes, kept indefinitely as a corpus | ⛔ **gitignored** |
+
+⚠️ **`<DOCS>/intake/` itself stays TRACKED.** Only the two subfolders are ignored. Getting this backwards is a live trap: in `fran-dash`, `docs/intake/` holds committed material (`intake-dashboard.md`, `intake-migration.md`, CSV exports) alongside the ignored subfolders, so an `intake/`-wide ignore rule would strand real project files.
+
+⚠️ **Two different exclusion mechanisms, deliberately — do not "simplify" them into one.**
+
+- **`<DOCS>/sessions/` → `.git/info/exclude`**, which is **per-clone and does not travel**. Ruled 2026-08-02: a desk in git invites *"it's committed, so I needn't land it"*, which is exactly the failure the desk's *Durability check* exists to catch. Because it cannot travel, the `session-desk` skill re-checks it on **every** desk creation.
+- **`<DOCS>/intake/{meetings,prs}/` → `.gitignore`**, which **is committed and therefore travels**. That is the point: it stops a *teammate* committing a note too.
+
+The mechanisms differ because the goals differ — one keeps a rule local, the other propagates it.
 
 ## Step 3: Create Starter Files
 
@@ -321,7 +344,27 @@ Optionally add reference docs in the `guides/` subdirectory.
 - `parser-conventions` — Enforces field naming standards across all parser nodes
 ```
 
-### .gitignore (only if no .gitignore exists)
+### .gitignore — two parts, with different conditions
+
+⚠️ **Read this split before editing either half.** The baseline below is scaffolding for a *new* project. The intake rules are **not** — they must be ensured on **every** run, including in a project that already has a `.gitignore`, because the folders they protect are created by skills that get adopted long after `init-project` ran. Gating them on *"only if no .gitignore exists"* means the one repo that most needs them — an established one — never gets them.
+
+#### Part A — always ensure these, appending if absent (idempotent)
+
+```bash
+# PR harvest + meeting reconciliation notes stay LOCAL. They cite line numbers
+# and paths that resolve only on the single writer's machine, and their
+# substance is required to reach DECISIONS.md / TODOS.md / LESSONS_LEARNED.md
+# anyway — so the note itself is staging, never a record.
+grep -q '^/docs/intake/meetings/$' .gitignore 2>/dev/null || printf '\n# Meeting reconciliation intake notes — LOCAL ONLY.\n/docs/intake/meetings/\n' >> .gitignore
+grep -q '^/docs/intake/prs/$'      .gitignore 2>/dev/null || printf '\n# PR harvest intake notes — LOCAL ONLY, same reasoning.\n/docs/intake/prs/\n' >> .gitignore
+
+# Session desks: per-clone, NOT .gitignore — see the note in Step 2.
+grep -q '^docs/sessions/$' .git/info/exclude 2>/dev/null || printf '\n# Session Desks — visible and editor-watched, but scratch.\ndocs/sessions/\n' >> .git/info/exclude
+```
+
+**On a client site under `/mnt/k/_Sites/`**, `<DOCS>` is `.cloaked/docs/`, which is already ignored wholesale — so adjust the paths to match `<DOCS>` and skip any rule that would be redundant. **Never leave the paths as literal `/docs/…` when `<DOCS>` resolved to `.cloaked/docs/`**; a rule that matches nothing is worse than no rule, because it reads as protection.
+
+#### Part B — baseline, only if no `.gitignore` exists
 
 Create a sensible .gitignore. Ask the user what language/framework they're using, then generate appropriate ignore patterns. Always include these baseline entries:
 
@@ -376,8 +419,14 @@ Show a tree-style summary of what was created:
 │   ├── TODOS.md
 │   ├── DECISIONS.md
 │   ├── LESSONS_LEARNED.md
-│   └── history/
-│       └── NEXT_STEPS-archive.md   # closed next-steps overflow
+│   ├── history/
+│   │   └── NEXT_STEPS-archive.md   # closed next-steps overflow
+│   ├── sessions/                   # ⛔ .git/info/exclude — per-clone, never travels
+│   │   ├── SESSION-DESK.md         # the live desk
+│   │   └── history/                # archived desks + backups/
+│   └── intake/                     # ✅ TRACKED — only the two subfolders below are not
+│       ├── meetings/               # ⛔ .gitignore — meeting reconciliation notes
+│       └── prs/                    # ⛔ .gitignore — PR harvest notes, kept as a corpus
 └── plans/
 ```
 
