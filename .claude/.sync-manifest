@@ -1,9 +1,9 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-08-03 00:39 MST
+# Last synced: 2026-08-06 15:26 MST
 e1fad792a169d0789d2b166a7d14cbab22a6adfbece64adb4b17f9b330951a68  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 c0e61ad160d419f0190134863f84a1cbbe655886d2ab828f1d4f508986a2a0ad  .claude/skills/wrap-up/SKILL.md
-54d3b33f9ceebd2a6b87662bf75561c52d917a5c3a801f2cd44dd829d5951708  .claude/skills/next-step/SKILL.md
+ab6dafc437cf44a3879f84fb94eaa4b6ffc3fc758cd82bcec668942e92be5f09  .claude/skills/next-step/SKILL.md
 701d626bebd01eb7352d4d876b6bc8ddd3de2520663a126ea7b4a959a7e72054  .claude/commands/init-project.md
 319ad84f6ccd50709c7017433811b579e9a863d175e7785fa3c72b3f07390749  .claude/commands/resume.md
 9a50013b99d1b34cea0522c0c9250c8891213f736f3e113723f4d9850efba4e8  .claude/commands/ship.md

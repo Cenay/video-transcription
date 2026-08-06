@@ -18,7 +18,7 @@ Reads the project's current state — documentation, plans, code, and git histor
 
 ### Step 1 — Gather Project State
 
-Read ALL of the following that exist in the current project directory. Skip any that don't exist — not every project has all of these.
+Read ALL the following that exist in the current project directory. Skip any that don't exist — not every project has all of these.
 
 1. **PRD.md** (or any PRD file) — master plan, phases, priorities
 2. **`docs/TODOS.md`** (a few repos use `TODO.md` — read whichever exists) — active task lists
