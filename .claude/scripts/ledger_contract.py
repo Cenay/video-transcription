@@ -291,7 +291,13 @@ def _cli(argv):
     if collisions:
         print("")
         for n, path in collisions:
-            print(f"  DEC-{n} exists in BOTH this ledger and {path}")
+            # Zero-pad to 3. `n` is an int (the set is built via int()), so an
+            # unpadded f-string printed "DEC-12" for a heading that reads
+            # `## DEC-012` -- unmatchable by grep and unfindable in the ledger.
+            # It misrendered precisely the legacy range around the DEC-012 floor,
+            # i.e. the numbers a reader is already most likely to be confused by.
+            # Found 2026-08-11 by the API repo's adversarial pass, not by these tests.
+            print(f"  DEC-{n:03d} exists in BOTH this ledger and {path}")
         print("")
         print("  One DEC- series spans both repos ([DEC-205]). Renumber this "
               "entry to a free number,")
