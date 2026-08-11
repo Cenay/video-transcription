@@ -226,7 +226,37 @@ def lint(text, path):
     for p in priors:
         if not PRIOR_LINT.match("- " + p):
             problems.append(f"malformed prior: {p[:70]}")
+    problems.extend(lint_shadow_chain(text))
     return problems
+
+
+# A doc may legitimately carry a bold `**Last updated:**` summary line ABOVE the
+# real traceability stamp (see parse_doc) -- CURRENT_STATUS.md does. That line is
+# a one-line snapshot, and it is NOT a stamp chain: it has no fold, no roll-down
+# and no cap, so anything prepended to it grows forever.
+#
+# Measured 2026-08-11 in fran-dash: two `_Prior:_` lines had accumulated beneath
+# that bold line -- 1,960 characters of header, every byte of it already present
+# in both the stamp fold and the session block it summarised. That is the same
+# shape as the 5,556-character stamp line this script was written to prevent,
+# starting over in a file the script was not looking at.
+#
+# parse_doc deliberately skips these lines (it locks onto the `transcript:`
+# stamp), so without this check they are invisible to every existing guard.
+SHADOW_PRIOR_RE = re.compile(r"^_Prior:_\s")
+
+
+def lint_shadow_chain(text):
+    """Standalone `_Prior:_` lines forming a second, unbounded stamp chain."""
+    hits = [l for l in text.split("\n") if SHADOW_PRIOR_RE.match(l)]
+    if not hits:
+        return []
+    chars = sum(len(l) for l in hits)
+    return [
+        f"{len(hits)} standalone `_Prior:_` line(s) ({chars} chars) form a second, "
+        f"unbounded stamp chain outside the fold — the `**Last updated:**` snapshot "
+        f"takes NO prior chain; move the history to the fold or delete it as redundant"
+    ]
 
 
 def main():
