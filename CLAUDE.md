@@ -1,6 +1,33 @@
 # CLAUDE.md
 
+_Last updated 2026-08-12 19:54 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added the team roster, the six locations and the four-step reconciliation chain, so a session can judge a name correction without re-asking._
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Who is in these meetings, and where the output goes
+
+**The transcripts this tool produces are meetings between TRFA teammates**, so the same names and project vocabulary recur constantly. This roster is here because the speech engine mangles names badly and a session cannot judge a correction without knowing who exists.
+
+| Name | Role | Notes |
+|---|---|---|
+| **Cenay** | Lead developer | ⚠️ Transcribed correctly **zero** times in 83 meetings — arrives as `senay`, `cinay`, `cnay`, `cna` |
+| **Khurram** | Developer | ⚠️ Also **zero** correct — arrives as `karam` (69×) or `haram` (37×) |
+| **Art** / **Arthur** | Owner | "Arthur" transcribes correctly (97×); "Art" is too short and ordinary to auto-correct |
+| **Milos** | VA | Usually correct (104×); Serbian pronunciation lands as `milosh` |
+| **Nik** | Realtop | Arrives as `nick` (42 lines) — ordinary English, so **not** auto-corrected pending a ruling |
+| **Jake** | Realtop | Correct 22×; near-misses are `make`/`take`, nothing safe to add |
+
+Locations: TRFA staff in **Miami, Orlando and Tampa**; developers in **Pakistan and Arizona**; VA staff in **Serbia**.
+
+**This tool is step 1 of a four-step chain**, and a wrong term gets more expensive at every step because each one copies it into more places:
+
+```
+transcribe (this tool) → meeting-reconcile → doc-reconcile → checkpoint
+```
+
+The Notion page this pipeline produces is fed **directly** into the `meeting-reconcile` skill, which stages changes into `DECISIONS.md` / `CURRENT_STATUS.md` / `TODOS.md` across several repos. That is why term correctness here is not cosmetic: a misheard table prefix becomes a wrong table name in a production decision record. See `docs/DECISIONS.md` → [DEC-002]…[DEC-008] and `docs/new-term-testing.md`.
+
+⚠️ **Reconciliations are reviewed by a human before they apply**, and misspellings are often caught there. That review is also where new terms get discovered — which is why `/add-term` ([DEC-008]) is designed to work from any repo.
 
 ## Project Overview
 
