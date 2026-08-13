@@ -158,10 +158,30 @@ Ruled by Cenay in a session-desk discussion. Each replaces an open question or s
 
   ⚠️ **The script FAILS LOUDLY if the canonical path is absent** — exits non-zero naming the path it tried. It must never "helpfully" create a fresh `terms.yml` somewhere unread: a silently-empty term list applies zero corrections while every run reports success.
 
+## ✅ `/add-term` BUILT 2026-08-13 — all three pieces landed
+
+Built in `claude-personal-toolkit` (transcript `777a93e2-2811-4093-b54c-d94264e721b5`), matching the ruling above.
+
+- **`commands/add-term.md`** → symlinked to `~/.claude/commands/add-term.md`, reachable from every repo.
+- **`scripts/add-term.py`** → the mechanism. **Toolkit-local, deliberately NOT in `sync-shared.sh`** — a copy in Khurram's repo would be a script pointing at `/mnt/k/Code/TRFA/video-transcription/config/terms.yml`, a path that does not exist on his machine, which is a worse failure than its absence.
+- **The `meeting-reconcile` prompt** → a new sub-step under *Step 2 — Distill and classify*, telling the session to keep a running list of the terms it silently corrected and offer them back as concrete `/add-term` calls. Explicitly **offer, never act unasked**, and explicitly **not** filed into the four intake buckets — a mishearing is transcriber damage, not something the meeting decided.
+
+**Design choices made during the build**, each with its reason:
+
+- **The edit is TEXTUAL, never a YAML round-trip.** `yaml.safe_load` + `safe_dump` would silently delete all ~40 comment lines in this file — the corpus counts, the possessive-swallowing warning, the whole *DELIBERATELY NOT INCLUDED* block. Those comments are most of the file's value. A test asserts every original comment line survives a write.
+- **It writes, then PROVES the correction will fire.** After writing, the file is re-parsed with this repo's own `scripts/terms.py` and the new variant must come back in `Term.applied()`. If it does not, the write is **rolled back**. "It parsed" was not a strong enough claim — a variant can parse fine and still be refused by the classifier at load time, which is a term that looks added and never fires.
+- **Risk is judged by importing `terms.py`, not by re-implementing `is_risky()`.** Two copies of that rule would give two answers to one question — accepted at the desk, refused at runtime.
+- **Refusal is exit code 2 with the `--force` command spelled out.** Per Cenay 2026-08-13: warn and offer, never silently accept and never silently refuse. The command file instructs the session to relay the warning and **ask** rather than deciding to `--force` on its own.
+- **Commit scope is enforced in code, not in a comment.** `git -C <root> commit -m … -- config/terms.yml` — one pathspec, so whatever else the other repo left dirty is untouched. It pushes too, by the same argument that justifies the commit: a commit sitting unpushed in a repo nobody works in is the same silent failure.
+
+**Tests:** `scripts/test-add-term.py`, 36 assertions, ✅ 36/36 — every case run against a **copy of the real `config/terms.yml`**, not a hand-rolled fixture. Negative tests cover the refusal path, the missing-`terms.yml` path and the missing-`terms.py` path, each asserting non-zero exit **and** an unchanged file. The suite was **mutation-tested**: disabling the refusal guard, the idempotence check and the missing-path guard each produced failures, so a pass means something.
+
+⚠️ **Finding — `book eeo`, this file's own advertised example, is REFUSED.** Verified by `python3 -c "import terms; terms.is_ordinary_english('eeo')"` → `True`: **`eeo` is in `/usr/share/dict/words`** (the EEO acronym), so every token of `book eeo` reads as English. The variant actually listed here is `book eoe`, which passes. This is the *same failure mode* the classifier rule already documents for `io` — the word list contains acronyms and abbreviations, so 3+ character tokens are not the clean signal they look like. **Not changed here**, because the rule was ruled and tested 19/19 and `--force` handles the case; but the `HOW TO ADD A TERM` comment in `terms.yml` advertises an example that does not work, and is worth correcting.
+
 ### Still open after this session
 
 - **Whether corrections also appear on the Notion page** (in addition to `logs/`). Marginal, given the human review gate.
-- **Where the auto-commit exception is recorded.** The rule it excepts lives in the **global** `~/.claude/CLAUDE.md`, so a session in another repo would read "do NOT auto-commit" and could treat `/add-term`'s behaviour as a bug. Recording it only here does not reach that reader.
+- ~~**Where the auto-commit exception is recorded.**~~ ✅ **Closed** — it is recorded in the global `~/.claude/CLAUDE.md` under *Safety Rails → Git*, which is what a session in another repo actually reads, with a ⛔ "do not fix this when you encounter it from another repo" note pointing back here.
 - **Team names.** A distributed team (Miami, Orlando, Tampa, Pakistan, Arizona, Serbia) means names are spoken constantly and mangled reliably. `Khurram` is already in the Layer 1 glossary example; the rest of the roster is wanted.
 
 ## Open questions

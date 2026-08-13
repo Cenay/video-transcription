@@ -7,7 +7,10 @@
 # HOW TO ADD A TERM
 #   Add a string to `heard:`. That is the whole job. Do not classify it, do not
 #   judge whether it is safe — scripts/terms.py decides that at load time.
-#   From another repo, use:  /add-term Bookeo "book eeo"
+#   From another repo, use:  /add-term Bookeo "book eoe"
+#   (Was "book eeo" until 2026-08-13 — that example was REFUSED, because `eeo`
+#   is in /usr/share/dict/words as the acronym and so every token read as
+#   English. Same trap as `io`. "book eoe" is the variant actually listed below.)
 #
 # HOW THE CLASSIFIER DECIDES  (verified 2026-08-12, 19/19 cases)
 #   A `heard:` variant is APPLIED if any of its tokens is not ordinary English.
