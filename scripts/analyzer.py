@@ -6,6 +6,8 @@ import json
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
+from terms import spelling_constraint
+
 load_dotenv()
 
 client = Anthropic()
@@ -75,6 +77,8 @@ Guidelines:
 - If speaker names aren't clear, use "Speaker" or describe by role if apparent
 - Mark uncertain items with (unclear) or (approximate)
 
+{spelling}
+
 TRANSCRIPT:
 {transcript}
 
@@ -121,7 +125,9 @@ def analyze_transcript(
         Parsed analysis dict, or {"error", "raw_response", "_usage"} if every
         attempt failed to parse.
     """
-    prompt = ANALYSIS_PROMPT.format(transcript=transcript)
+    prompt = ANALYSIS_PROMPT.format(
+        transcript=transcript, spelling=spelling_constraint()
+    )
     messages = [{"role": "user", "content": prompt}]
 
     total_input = total_output = 0

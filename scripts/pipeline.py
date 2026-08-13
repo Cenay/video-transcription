@@ -29,8 +29,28 @@ from analyzer import (
     estimate_analysis_cost
 )
 from notion_output import create_meeting_page
+from terms import apply_corrections, correct_structure, format_report
 
 load_dotenv()
+
+LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+
+
+def write_corrections_log(stem: str, changes: list, report: str) -> Path:
+    """Append this run's substitutions to logs/term-corrections.log ([DEC-006]).
+
+    One cumulative file, not one per run: the question this log answers is
+    "which meetings did a bad term entry touch?", and that is a grep across
+    runs, not a hunt through per-run files.
+    """
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = LOG_DIR / "term-corrections.log"
+    # .astimezone() so %Z resolves — a naive datetime renders the zone empty.
+    stamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write(f"\n=== {stamp} — {stem} ===\n")
+        fh.write(report + "\n")
+    return log_path
 
 
 def process_video(
@@ -177,7 +197,25 @@ def process_video(
                 "utterance_count": len(transcription.get("utterances", [])),
                 "confidence": transcription.get("confidence")
             }
-        
+
+        # Term normalization ([DEC-004]). This is the convergence point of the
+        # --from-cache and fresh-transcription branches, so one call covers
+        # both. Everything downstream — analysis, the Notion page, and the
+        # meeting reconciliation that reads it — sees corrected text. The raw
+        # cache written in transcriber.py stays uncorrected on purpose, so a
+        # bad term entry is always recoverable.
+        transcript_text, corrections = apply_corrections(transcript_text)
+        report = format_report(corrections)
+        print("\n[terms] Domain term corrections:")
+        print(report)
+        result["transcript"] = transcript_text
+        result["corrections"] = [
+            {"term": c.term, "variant": c.variant, "count": c.count, "forced": c.forced}
+            for c in corrections
+        ]
+        log_path = write_corrections_log(video_path.stem, corrections, report)
+        print(f"  Logged to: {log_path}")
+
         # Transcribe-only mode: save transcript and stop
         if transcribe_only:
             output_dir = Path(__file__).parent.parent / "output"
@@ -230,6 +268,32 @@ def process_video(
             print("   Re-run with --from-cache once resolved (no re-transcription cost).")
             result["error"] = analysis["error"]
             return result
+
+        # Second correction pass, over the ANALYSIS rather than the transcript.
+        # The prompt already carries the spelling constraint, so this should
+        # normally find nothing — and that is exactly what makes it useful.
+        # A non-empty result here is a signal, not a routine fix: it means the
+        # model invented a wrong term the transcript never contained (the
+        # `bookio_product_groups` case, which is where the original incident
+        # did its damage). Runs AFTER the error guard so a failed analysis is
+        # not walked.
+        analysis, analysis_corrections = correct_structure(analysis)
+        if analysis_corrections:
+            report = format_report(analysis_corrections)
+            print("\n  ⚠️  The ANALYSIS contained wrong terms the prompt "
+                  "constraint failed to prevent:")
+            print(report)
+            print("     (fixed — but worth checking why the constraint missed them)")
+            write_corrections_log(
+                f"{video_path.stem} [ANALYSIS — prompt constraint missed these]",
+                analysis_corrections,
+                report,
+            )
+            result["analysis_corrections"] = [
+                {"term": c.term, "variant": c.variant, "count": c.count}
+                for c in analysis_corrections
+            ]
+        result["analysis"] = analysis
 
         # Calculate total cost
         result["costs"]["total"] = (

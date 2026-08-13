@@ -1,8 +1,39 @@
 # Lessons Learned
 
-_Last updated 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added three lessons: four defects all found by running not reading, the engine's total failure on non-English names, and the one-meeting generalisation that produced a wrong plan finding._
+_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — added the 2026-08-13 entry: shared prompt constants have multiple callers, stub the expensive call not the path, verification runs corrupt an audit log_
+
+<details>
+<summary>📜 <strong>Stamp history</strong> — the 1 previous update (older ones: <code>history/LESSONS_LEARNED-stamp-history.md</code>)</summary>
+
+- _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added three lessons: four defects all found by running not reading, the engine's total failure on non-English names, and the one-meeting generalisation that produced a wrong plan finding._
+
+</details>
 
 Running log of non-obvious failures and how we diagnosed/fixed them. Append new entries at the top.
+
+---
+
+## 2026-08-13 — Wiring the corrector in: a shared prompt constant has more than one caller
+
+### Gotcha: adding a `.format()` placeholder to a shared prompt breaks every other caller
+
+**Symptom:** adding `{spelling}` to `ANALYSIS_PROMPT` (`analyzer.py:24`) and passing it from `analyze_transcript()` looked complete — the pipeline ran fine. But `scripts/diagnose_analysis.py` imports that same constant and formats it *itself*, with only `transcript=`. It would have died with `KeyError: 'spelling'` the next time anyone diagnosed a failed analysis — which is precisely the moment you least want a second failure.
+
+**Why it was caught:** `grep -rn "ANALYSIS_PROMPT" scripts/ tests/` before declaring the change done. Nothing about the pipeline run would have surfaced it, because the broken caller is a separate diagnostic script that only runs after an incident.
+
+**The general rule:** a prompt constant exported from a module is an interface, and changing its `.format()` keys is a **breaking interface change**. Grep for every caller before touching placeholders. Fixed in the same change.
+
+### Verification: to test a seam that sits after an expensive API call, stub the call — don't skip the test
+
+The analysis correction pass runs on the output of `analyze_transcript()`, so exercising it "properly" means paying for a Claude call. The cheap wrong move is to unit-test the function and *assume* the pipeline calls it correctly — which tests the part that was never in doubt.
+
+**What was done instead:** a throwaway harness monkeypatched `pipeline.analyze_transcript` to return a **deliberately poisoned** analysis (`bookio_product_groups`, `karam`, `senay` — terms the transcript never contained) and `pipeline.create_meeting_page` to capture its argument, then ran the **real** `process_video()` over a cached transcript. That proved what the unit tests could not: the seam fires on the real path, in the right order relative to the error guard, and the corrected object is what reaches Notion. Cost: nothing.
+
+**The general rule:** when a code path is guarded by an expensive call, stub the call and run the real path. Stubbing the *dependency* keeps the test honest; stubbing the *path* does not.
+
+### Workflow: a log seeded by verification runs is a corrupted audit trail
+
+`logs/term-corrections.log` exists to answer "which meetings did a bad term entry touch?". After verification it contained four entries — all synthetic, one of them from the poisoned-analysis harness, i.e. **fabricated data in an audit file**. Archived to `.archived/2026-08-12/term-corrections-VERIFICATION-RUNS.log` rather than deleted, so the real log starts empty. A verification artifact that looks exactly like a production record is worse than no record.
 
 ---
 

@@ -165,6 +165,81 @@ def apply_corrections(
     return text, changes
 
 
+def spelling_constraint(terms: list[Term] | None = None) -> str:
+    """Render the term list as a spelling instruction for the analysis prompt.
+
+    Correcting the transcript is not enough: the model CONSTRUCTS identifiers
+    that nobody speaks aloud ("bookio_product_groups" in a summary heading), so
+    a term can enter the output without ever appearing in the input. This block
+    constrains generation; correct_structure() below catches what it misses.
+    """
+    if terms is None:
+        terms = load_terms()
+
+    lines = [
+        "SPELLING (domain vocabulary — these are proper nouns in this company, "
+        "and the transcript's speech-to-text mangles them):",
+    ]
+    for term in terms:
+        wrong = ", ".join(sorted(f"{v!r}" for v in term.heard))
+        line = f"- Always write {term.correct!r}"
+        if term.identifier_prefix:
+            line += f" (identifiers use the prefix {term.identifier_prefix!r})"
+        if wrong:
+            line += f". Never write: {wrong}"
+        lines.append(line)
+    lines.append(
+        "Apply these spellings everywhere — including inside table names, "
+        "column names, code identifiers and headings you compose yourself."
+    )
+    return "\n".join(lines)
+
+
+def correct_structure(obj, terms: list[Term] | None = None):
+    """Apply corrections to every string in a nested dict/list. Returns
+    (corrected_obj, substitutions).
+
+    The analysis result is JSON, so the wrong token can be anywhere — a
+    heading, a decision's rationale, an action item's owner. Keys are corrected
+    as well as values, because a mangled key would break the Notion renderer's
+    lookups; in practice keys are fixed schema names and never change.
+
+    `_usage` is skipped: it is our own bookkeeping, not model prose.
+    """
+    if terms is None:
+        terms = load_terms()
+
+    changes: list[Substitution] = []
+
+    def walk(node):
+        if isinstance(node, str):
+            fixed, subs = apply_corrections(node, terms)
+            changes.extend(subs)
+            return fixed
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        if isinstance(node, dict):
+            return {
+                (k if k == "_usage" else walk(k)): (v if k == "_usage" else walk(v))
+                for k, v in node.items()
+            }
+        return node
+
+    return walk(obj), _merge(changes)
+
+
+def _merge(changes: list[Substitution]) -> list[Substitution]:
+    """Collapse per-string substitutions into one row per (term, variant)."""
+    merged: dict[tuple[str, str], Substitution] = {}
+    for c in changes:
+        key = (c.term, c.variant)
+        if key in merged:
+            merged[key].count += c.count
+        else:
+            merged[key] = Substitution(c.term, c.variant, c.count, c.forced)
+    return list(merged.values())
+
+
 def format_report(changes: list[Substitution]) -> str:
     """Human-readable summary for the run output and the log."""
     if not changes:

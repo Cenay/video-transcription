@@ -9,6 +9,7 @@ import anthropic
 
 sys.path.insert(0, str(Path(__file__).parent))
 from analyzer import ANALYSIS_PROMPT, MODEL
+from terms import spelling_constraint
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -21,7 +22,9 @@ client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 resp = client.messages.create(
     model=MODEL,
     max_tokens=4096,
-    messages=[{"role": "user", "content": ANALYSIS_PROMPT.format(transcript=transcript)}],
+    messages=[{"role": "user", "content": ANALYSIS_PROMPT.format(
+        transcript=transcript, spelling=spelling_constraint()
+    )}],
 )
 text = resp.content[0].text
 out = cache / f"{stem}-RAW-ANALYSIS.txt"

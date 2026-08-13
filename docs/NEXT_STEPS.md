@@ -1,10 +1,11 @@
 # Next Steps — video-transcription
 
-_Last updated 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — rewrote the handoff for step 2 (wiring apply_corrections into pipeline.py:180); added the classifier and possessive gotchas._
+_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — rewrote the handoff around the live-meeting measurement; added the shared-prompt and dict-key gotchas_
 
 <details>
-<summary>📜 <strong>Stamp history</strong> — the 1 previous update (older ones: <code>history/NEXT_STEPS-stamp-history.md</code>)</summary>
+<summary>📜 <strong>Stamp history</strong> — the 2 previous updates (older ones: <code>history/NEXT_STEPS-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — rewrote the handoff for step 2 (wiring apply_corrections into pipeline.py:180); added the classifier and possessive gotchas._
 - _Prior: 2026-08-12 19:15 MST_
 
 </details>
@@ -14,22 +15,22 @@ _Last updated 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca
 
 ## Where We Left Off
 
-Built and tested the term corrector — `config/terms.yml`, `scripts/terms.py`, `scripts/preview_corrections.py`, `tests/test_terms.py` — but **it is not wired into the pipeline yet**, so it currently affects nothing. Everything so far is standalone and provably safe: 56 tests pass, and a sweep of all 83 cached transcripts produces 630 corrections with zero ordinary-English words altered.
+**The term corrector is wired in and live.** Steps 1–3 of the build order are shipped: the transcript pass runs at the convergence point ([DEC-004]), and the analysis stage is protected twice — a generated spelling constraint in `ANALYSIS_PROMPT` plus a post-pass over the returned JSON ([DEC-009]). 75 assertions pass, and a real `--from-cache` run publishes `bookeo_` with zero `bookio` while leaving ordinary English untouched.
+
+**Uncommitted** — Cenay is testing against a live meeting first, per the standing no-auto-commit rule.
 
 ## Pick Up Here
 
-**First, wire it in.** Add the correction pass to `scripts/pipeline.py` at line 180 — the point where the `--from-cache` branch (`:109`) and the fresh-transcription branch (`:170`) converge, so one call covers both ([DEC-004]):
+**First, read the live-meeting result.** ⚠️ **The one thing not verified is whether the model obeys the spelling constraint** — only that the constraint renders and reaches the API payload. The run against tonight's meeting answers it, and the number to look at is the analysis post-pass report:
 
-```python
-transcript_text, corrections = apply_corrections(transcript_text)
-print(format_report(corrections))
-```
+- **Silence** (no `⚠️ The ANALYSIS contained wrong terms…` block) → the constraint held. That is the expected and good outcome.
+- **A non-empty report** → the constraint did *not* hold, the post-pass caught it, and the terms it lists are ones the model **invented** rather than heard. Worth reading `logs/term-corrections.log` for the `[ANALYSIS — …]` entry and considering whether the constraint wording needs strengthening.
 
-Print the report and write it to `logs/` ([DEC-006]). Then run a `--from-cache` pass over an already-cached meeting and confirm the Notion page comes out with `bookeo_` and zero `bookio` — that is the plan's stated success criterion, and it costs nothing because the transcript is cached.
+Either way the published page is correct — the post-pass is the net. The residual is a measurement, not a failure.
 
-**Second, decide about the analysis stage.** The transcript pass alone does not stop Claude from *constructing* a wrong identifier like `bookio_product_groups` in the summary — that is where the original incident actually did its damage. Two options, and `plans/term-normalization.md` argues for doing both and using the difference as a signal: apply the same `apply_corrections()` to the analysis output after `pipeline.py:207`, and/or inject the term list into `ANALYSIS_PROMPT` as a spelling constraint (`analyzer.py:24` — confirmed to be a single prompt with one insertion point).
+**Second, if the run looks right, commit.** Five files: `scripts/{pipeline,analyzer,terms,diagnose_analysis}.py` and `tests/test_terms.py`, plus the doc set.
 
-**Third, if there is appetite:** build `/add-term` ([DEC-008]) so terms can be added from whichever repo you happen to be reconciling in. Designed in detail, not started.
+**Third, if there is appetite:** build `/add-term` ([DEC-008]) so terms can be added from whichever repo you happen to be reconciling in. Designed in detail, not started — and it is the item that most affects day-to-day cost, since terms are discovered during reconciliation review in another repo.
 
 ## Decisions Needed
 
@@ -46,6 +47,10 @@ Print the report and write it to `logs/` ([DEC-006]). Then run a `--from-cache` 
 
 ⚠️ **`/add-term` will auto-commit `terms.yml`** when built — a deliberate exception to the no-auto-commit rule, recorded in the global `~/.claude/CLAUDE.md` so a session in another repo does not "fix" it.
 
+⚠️ **`ANALYSIS_PROMPT` has more than one caller.** Adding the `{spelling}` placeholder broke `scripts/diagnose_analysis.py` with `KeyError: 'spelling'` — it formats the shared constant itself. Grep for `ANALYSIS_PROMPT` before touching its placeholders.
+
+⚠️ **`correct_structure()` corrects dict keys as well as values.** Harmless today because keys are fixed schema names, but a term colliding with a schema key would break `notion_output.py`'s lookups. Noted in [DEC-009], deliberately not guarded.
+
 **A pattern from the session worth carrying:** four separate defects were found here, and **every one surfaced by running something — none by reading it.** The fuzzy miner silently missed the `haram` variant (37 occurrences) because it fell below a similarity threshold, and a silent miss looks exactly like a clean result.
 
 ## Queued (unblocked, not yet scheduled)
@@ -60,6 +65,6 @@ Print the report and write it to `logs/` ([DEC-006]). Then run a `--from-cache` 
 <!-- link-doc-refs:start (auto-generated — edit the IDs in prose, not this block) -->
 [DEC-004]: DECISIONS.md#dec-004-the-substitution-runs-at-the-pipelinepy180-convergence-point
 [DEC-005]: DECISIONS.md#dec-005-one-flat-term-table-the-code-classifies-risk-not-the-author
-[DEC-006]: DECISIONS.md#dec-006-every-correction-is-logged-to-logs
 [DEC-008]: DECISIONS.md#dec-008-add-term-will-auto-commit-its-one-file--an-exception-to-the-no-auto-commit-rule
+[DEC-009]: DECISIONS.md#dec-009-the-analysis-stage-is-protected-twice--a-prompt-constraint-and-a-post-pass-and-the-gap-between-them-is-the-measurement
 <!-- link-doc-refs:end -->

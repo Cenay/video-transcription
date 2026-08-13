@@ -31,9 +31,11 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from terms import (  # noqa: E402
     Term,
     apply_corrections,
+    correct_structure,
     is_ordinary_english,
     is_risky,
     load_terms,
+    spelling_constraint,
 )
 
 PASS, FAIL = [], []
@@ -200,7 +202,78 @@ def test_missing_file_fails_loudly():
 
 
 # ---------------------------------------------------------------------------
-# 7. Optional: sweep every cached transcript
+# 7. The analysis stage — prompt constraint + the post-pass over the JSON
+# ---------------------------------------------------------------------------
+def test_spelling_constraint():
+    print("\n[7] spelling_constraint() renders every shipped term")
+    block = spelling_constraint()
+    terms = load_terms()
+
+    for t in terms:
+        check(f"names the correct spelling {t.correct!r}", t.correct in block)
+
+    # The prompt must name the wrong forms explicitly — "spell things right" is
+    # not an instruction a model can act on.
+    check("names 'bookio' as a form to never write", "bookio" in block)
+    check("names the identifier prefix", "bookeo_" in block)
+    check("mentions composed identifiers, not just prose",
+          "identifier" in block.lower())
+
+    # Negative: an empty term list must not silently render an empty rule block
+    # that still LOOKS like a constraint in the prompt.
+    minimal = spelling_constraint([Term(correct="Bookeo", heard=["bookio"])])
+    check("a one-term list renders only that term",
+          "Bookeo" in minimal and "Khurram" not in minimal)
+
+
+def test_correct_structure():
+    print("\n[8] correct_structure() walks nested analysis JSON")
+    # Shaped like a real analyze_transcript() return: the wrong token is in a
+    # composed identifier that no speaker ever said aloud — the actual incident.
+    analysis = {
+        "overview": ["Reviewed the bookio_product_groups table with karam"],
+        "notes": [{"emoji": "📊", "title": "Bookio schema",
+                   "bullets": ["bookio_bookings needs an index"]}],
+        "decisions": [{"decision": "Rename bookio_customers",
+                       "rationale": "consistency", "participants": "senay"}],
+        "_usage": {"model": "claude-sonnet-4-6", "input_tokens": 100},
+    }
+    fixed, changes = correct_structure(analysis)
+    flat = json.dumps(fixed)
+
+    check("no 'bookio' survives anywhere in the structure",
+          "bookio" not in flat.lower(), flat[:120])
+    check("the composed identifier is repaired",
+          "bookeo_product_groups" in flat)
+    check("a nested list-of-dicts value is corrected",
+          "bookeo_bookings" in flat)
+    check("names are corrected too",
+          "Khurram" in flat and "Cenay" in flat)
+    check("substitutions are reported, not applied silently",
+          len(changes) > 0 and sum(c.count for c in changes) >= 5,
+          f"changes={[(c.variant, c.count) for c in changes]}")
+    check("_usage bookkeeping is left alone",
+          fixed["_usage"] == analysis["_usage"])
+    check("structure is preserved (same keys, same shapes)",
+          list(fixed) == list(analysis)
+          and len(fixed["notes"][0]["bullets"]) == 1)
+
+    # Paired negative: prose inside the analysis must survive the walk intact,
+    # exactly as it does for transcripts. If this stops failing when the guard
+    # is removed, the guard has stopped meaning anything.
+    innocent = {"summary": "We need to book it before the booking window closes."}
+    out, subs = correct_structure(innocent)
+    check("ordinary English inside the analysis is untouched",
+          out == innocent and not subs, f"{out} / {subs}")
+
+    forced_bad = [Term(correct="Bookeo", heard=["book it"], force=["book it"])]
+    out2, _ = correct_structure(innocent, forced_bad)
+    check("...and the guard is load-bearing (forcing it DOES corrupt)",
+          out2 != innocent, out2["summary"])
+
+
+# ---------------------------------------------------------------------------
+# 9. Optional: sweep every cached transcript
 # ---------------------------------------------------------------------------
 DANGEROUS = ["booking", "bookings", "booked", "bookie", "book it", "book he",
              "book you", "book here", "book a", "books", "make", "take", "nick",
@@ -208,7 +281,7 @@ DANGEROUS = ["booking", "bookings", "booked", "bookie", "book it", "book he",
 
 
 def test_corpus():
-    print("\n[7] corpus sweep — every cached transcript")
+    print("\n[9] corpus sweep — every cached transcript")
     terms = load_terms()
     files = sorted(glob.glob(str(ROOT / "temp/transcribe-cache/*.json")))
     total, corrupted, seen = 0, [], 0
@@ -250,10 +323,12 @@ def main():
     test_possessive_preserved()
     test_shipped_config()
     test_missing_file_fails_loudly()
+    test_spelling_constraint()
+    test_correct_structure()
     if "--corpus" in sys.argv:
         test_corpus()
     else:
-        print("\n[7] corpus sweep — SKIPPED (pass --corpus to run it)")
+        print("\n[9] corpus sweep — SKIPPED (pass --corpus to run it)")
 
     print("\n" + "=" * 60)
     print(f"  {len(PASS)} passed, {len(FAIL)} failed")
