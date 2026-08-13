@@ -1,6 +1,6 @@
 # Next Steps — video-transcription
 
-_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — rewrote the handoff around the live-meeting measurement; added the shared-prompt and dict-key gotchas_
+_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — rewrote the handoff around the live-meeting measurement; added the shared-prompt and dict-key gotchas; expanded /add-term into three concrete pieces after confirming it does not exist_
 
 <details>
 <summary>📜 <strong>Stamp history</strong> — the 2 previous updates (older ones: <code>history/NEXT_STEPS-stamp-history.md</code>)</summary>
@@ -17,7 +17,7 @@ _Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c9
 
 **The term corrector is wired in and live.** Steps 1–3 of the build order are shipped: the transcript pass runs at the convergence point ([DEC-004]), and the analysis stage is protected twice — a generated spelling constraint in `ANALYSIS_PROMPT` plus a post-pass over the returned JSON ([DEC-009]). 75 assertions pass, and a real `--from-cache` run publishes `bookeo_` with zero `bookio` while leaving ordinary English untouched.
 
-**Uncommitted** — Cenay is testing against a live meeting first, per the standing no-auto-commit rule.
+**Committed and pushed** as `7e7339f` (2026-08-13). The tree is clean.
 
 ## Pick Up Here
 
@@ -28,9 +28,21 @@ _Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c9
 
 Either way the published page is correct — the post-pass is the net. The residual is a measurement, not a failure.
 
-**Second, if the run looks right, commit.** Five files: `scripts/{pipeline,analyzer,terms,diagnose_analysis}.py` and `tests/test_terms.py`, plus the doc set.
+**Second, record what that run showed** — in [`TODOS.md`](TODOS.md) (the Active item exists for it) and, if the residual is non-zero, as an amendment to [DEC-009]. The code is already shipped, so this step is measurement and bookkeeping, not a build.
 
-**Third, if there is appetite:** build `/add-term` ([DEC-008]) so terms can be added from whichever repo you happen to be reconciling in. Designed in detail, not started — and it is the item that most affects day-to-day cost, since terms are discovered during reconciliation review in another repo.
+**Third — build `/add-term` ([DEC-008]). It does not exist yet.**
+
+⚠️ **It is easy to believe this is already built, and it is not.** The global `~/.claude/CLAUDE.md` describes it in the **present tense** ("The `/add-term` command — and only that command — commits and pushes its single target file automatically"), and that file loads into every session in every repo. Verified 2026-08-13 by `find /home/cenay/.claude /mnt/k/Code/claude-personal-toolkit -iname "*add-term*"` → **no results**. Nothing exists: no command file, no script, no skill prompt.
+
+Three pieces, per [DEC-008]:
+
+1. **`~/.claude/commands/add-term.md`** — the global slash command, callable from any repo.
+2. **`claude-personal-toolkit/scripts/add-term.py`** — writes to this repo's `config/terms.yml` **by absolute path**, then commits and pushes **that one file only**. Never `git commit -a`, never a sweep of whatever the calling repo left dirty. **Fails loudly with the path it tried** if the file is absent, rather than creating a fresh one — a silently-created empty term list would apply zero corrections while every run reported success.
+3. **A prompt in the `meeting-reconcile` skill** — offer `/add-term` when a reconciliation review corrects a misheard term. This is the piece that actually makes it get used, since that review is where terms are discovered.
+
+**Why this is the highest-value item left.** Terms are found while reviewing a reconciliation in *another* repo (`fran-dash`, `trfaapi.com`). Today that means switching to this repo, hand-editing YAML, and remembering to commit — so in practice the term never gets added and the mishearing recurs in every later meeting. Adding a term should cost one line typed from wherever you are.
+
+⚠️ **When it is built, the present-tense wording in the global `~/.claude/CLAUDE.md` becomes correct rather than aspirational** — worth re-reading that section then to confirm it matches what was actually built.
 
 ## Decisions Needed
 

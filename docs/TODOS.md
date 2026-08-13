@@ -1,6 +1,6 @@
 # TODOs — video-transcription
 
-_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — moved the wire-in and analysis-stage items to Completed; added the live-model confirmation item_
+_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — moved the wire-in and analysis-stage items to Completed; added the live-model confirmation item; flagged /add-term as verified-not-built_
 
 <details>
 <summary>📜 <strong>Stamp history</strong> — the 2 previous updates (older ones: <code>history/TODOS-stamp-history.md</code>)</summary>
@@ -25,8 +25,8 @@ The only unverified half of [DEC-009]. `spelling_constraint()` is proven to rend
 ### Decide `Nik` vs `nick`
 `nick` appears on 42 lines across 8 cached transcripts. Every sample reads as the person, but it is ordinary English so the classifier refuses it by default. Vet with `./venv/bin/python scripts/preview_corrections.py --all --grep nick`, then either add it to `force:` in `config/terms.yml` or leave it documented as deliberately excluded.
 
-### Build `/add-term` ([DEC-008])
-Global slash command + `claude-personal-toolkit/scripts/add-term.py` + a prompt in the `meeting-reconcile` skill. Auto-commits `config/terms.yml` and only that file; fails loudly with the path it tried rather than creating a fresh one. Designed in `plans/term-normalization.md`, not built.
+### Build `/add-term` ([DEC-008]) — ⚠️ NOT BUILT, despite reading as if it is
+Global slash command + `claude-personal-toolkit/scripts/add-term.py` + a prompt in the `meeting-reconcile` skill. Auto-commits `config/terms.yml` and only that file; fails loudly with the path it tried rather than creating a fresh one. Designed in `plans/term-normalization.md`, **not built** — verified 2026-08-13, `find` over `~/.claude` and the toolkit returns nothing. The global `~/.claude/CLAUDE.md` describes it in the present tense, which is why it reads as existing. Full breakdown in [`NEXT_STEPS.md`](NEXT_STEPS.md).
 
 ### Decide whether corrections appear on the Notion page
 In addition to `logs/`. Marginal — reconciliations are reviewed by a human anyway, so the page block would only save a manual correction rather than prevent a bad decision entry.
