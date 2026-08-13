@@ -6,3 +6,4 @@ rq>=1.15.0
 redis>=4.5.0
 notion-client>=2.0.0
 python-dotenv>=1.0.0
+pyyaml>=6.0

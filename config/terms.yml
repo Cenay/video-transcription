@@ -1,0 +1,118 @@
+# Domain term normalization — "when you hear XXX, write YYY"
+#
+# Seeded 2026-08-12 from a frequency analysis of 83 cached raw transcripts in
+# temp/transcribe-cache/ (27,014 utterances, ~3 MB). Counts in comments are the
+# number of times that form actually appeared in real meetings — not guesses.
+#
+# HOW TO ADD A TERM
+#   Add a string to `heard:`. That is the whole job. Do not classify it, do not
+#   judge whether it is safe — scripts/terms.py decides that at load time.
+#   From another repo, use:  /add-term Bookeo "book eeo"
+#
+# HOW THE CLASSIFIER DECIDES  (verified 2026-08-12, 19/19 cases)
+#   A `heard:` variant is APPLIED if any of its tokens is not ordinary English.
+#   It is REFUSED if every token is ordinary English, because replacing those
+#   corrupts normal prose — "the book he mentioned" must not become
+#   "the Bookeo mentioned". Tokens of 1-2 chars are checked against a stop-word
+#   set; longer tokens against /usr/share/dict/words.
+#
+#   `force:` overrides that refusal for variants you personally vouch for.
+#   Use it only where the phrase has no innocent meaning in these meetings.
+#   Every forced substitution is logged loudly.
+
+terms:
+
+  # ---------------------------------------------------------------- Bookeo --
+  # The term that started this. `bookio` is the dominant wrong token across the
+  # archive (347), which contradicts the original single-meeting finding that
+  # the engine "produces mush" rather than a consistent error.
+  - correct: Bookeo
+    heard:
+      - bookio          # 347
+      # NOT "bookio's" (14) — deliberately. The bare `bookio` rule already
+      # rewrites it correctly to "Bookeo's"; listing the possessive separately
+      # matches first (longest-first ordering) and SWALLOWS the "'s".
+      # Regression-tested in tests/test_terms.py::test_possessive_preserved.
+      - booko           #   9
+      - booku           #   7
+      - bookq           #   4
+      - book io         # plan's original example
+      - book eoe        # reported by Cenay
+    identifier_prefix: bookeo_   # rewrites bookio_product_groups -> bookeo_product_groups
+    # NOT listed, deliberately — all ordinary English, all legitimate in a
+    # booking-software meeting: booking (259), booked (73), bookings (65),
+    # book it (39), bookie (31), book here (29), book you (99).
+    # Adding any of these would corrupt prose at scale.
+
+  # --------------------------------------------------------------- Khurram --
+  # "Khurram" appears ZERO times in 83 transcripts — the engine never gets it
+  # right. `karam` is what it hears.
+  - correct: Khurram
+    heard:
+      - karam           #  69
+      - haram           #  37 — found 2026-08-12 by eyeballing preview output,
+                        #      not by the fuzzy miner, which scored it too far
+                        #      from "Khurram" to suggest. Confirmed from context:
+                        #      "I had a meeting with Haram", "Haram has written
+                        #      another API with me". One utterance even contains
+                        #      "Haram and Karam" — the engine hearing the same
+                        #      name two ways in a single sentence.
+      - keram           #   1
+
+  # ----------------------------------------------------------------- Cenay --
+  # Also never transcribed correctly: zero correct occurrences in the archive.
+  - correct: Cenay
+    heard:
+      - senay           #  13
+      # NOT "senay's" (1) — same possessive-swallowing bug as Bookeo above.
+      - cinay           #   1
+      - cnay            #   1
+      - cna             #   3
+
+  # ----------------------------------------------------------------- Milos --
+  # Usually correct (104), but the Serbian pronunciation lands as "milosh".
+  - correct: Milos
+    heard:
+      - milosh          #   7
+      - miloshin        #   1
+
+  # -------------------------------------------------------- ActiveCampaign --
+  # Correct 232 times, but split into two words 61 times. Both tokens are
+  # ordinary English, so the classifier refuses it by default — forced here
+  # because "active campaign" has no innocent meaning in these meetings.
+  - correct: ActiveCampaign
+    heard:
+      - active campaign     #  61
+    force:
+      - active campaign
+
+  # ------------------------------------------------------------- fran-dash --
+  # Never transcribed with the hyphen. "fran dash" is ordinary-English by token,
+  # so it needs the same override.
+  - correct: fran-dash
+    heard:
+      - fran dash       #  46
+      - brandash        #   4
+      - friendash       #   2
+      - frontash        #   2
+      - crandash        #   1
+      - fran desh       #   1
+    force:
+      - fran dash
+
+# ---------------------------------------------------------------------------
+# DELIBERATELY NOT INCLUDED — each of these was measured and left out. Recorded
+# so nobody "helpfully" adds them later without knowing why.
+#
+#   Nik / "nick" (46)   — every occurrence looks like the person, but `nick` is
+#                         ordinary English and this needs Cenay's call before it
+#                         is forced. See the session desk, Q5.
+#   Jake                — correct 22 times; the near-misses are make (1154),
+#                         take (577), bake, wake, jack. Nothing safe to add.
+#   Art / Arthur        — "Arthur" is transcribed correctly 97 times. "Art" is
+#                         too short and too ordinary to correct safely.
+#   TRFA                — correct 169 times. `trfaapi` and `trfapi` are NOT
+#                         errors: trfaapi.com is a real, distinct project.
+#   Blade / Notion /    — near-misses are all common English (claude, nothing,
+#   Inertia / Eloquent    options, insert). Correct forms already dominate.
+#   Realtop             — zero occurrences either way; nothing to learn yet.

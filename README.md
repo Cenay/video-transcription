@@ -23,6 +23,19 @@ transcribe-this /path/to/video.mp4 --from-cache
 transcribe-this /path/to/video.mp4 --no-cleanup
 ```
 
+### Term corrections
+
+The transcription reliably mangles domain vocabulary and names — `Khurram` and `Cenay` are transcribed correctly **zero** times across 83 recorded meetings. `config/terms.yml` lists the known mishearings and `scripts/terms.py` repairs them, refusing any variant made entirely of ordinary English words so normal prose is never corrupted.
+
+```bash
+./venv/bin/python scripts/preview_corrections.py tampa          # before/after, one meeting
+./venv/bin/python scripts/preview_corrections.py --all          # ranked across all cached transcripts
+./venv/bin/python scripts/preview_corrections.py --all --grep X # vet a candidate word
+./venv/bin/python tests/test_terms.py --corpus                  # 56 assertions + corpus sweep
+```
+
+All of the above are read-only and free — they run against transcripts already cached in `temp/transcribe-cache/`. Adding a term: [docs/new-term-testing.md](docs/new-term-testing.md).
+
 Architecture and implementation notes live in [CLAUDE.md](CLAUDE.md); gotchas in [docs/LESSONS_LEARNED.md](docs/LESSONS_LEARNED.md).
 
 ## License
