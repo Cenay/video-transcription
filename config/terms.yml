@@ -116,6 +116,14 @@ terms:
       - tranul  # 2026-08-13 Art meeting
       - tranule  # 2026-08-13 Art meeting
 
+  # ------------------------------------------------------------- Ninthroot --
+  # Added 2026-08-13 via /add-term.
+  - correct: Ninthroot
+    heard:
+      - ninth root
+    force:
+      - ninth root
+
 # ---------------------------------------------------------------------------
 # DELIBERATELY NOT INCLUDED — each of these was measured and left out. Recorded
 # so nobody "helpfully" adds them later without knowing why.
