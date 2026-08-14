@@ -173,13 +173,22 @@ def test_shipped_config():
     check("Bookeo carries an identifier prefix",
           by_name["Bookeo"].identifier_prefix == "bookeo_")
 
-    # Only two entries may use `force:`, and both were justified by measurement.
+    # `force:` overrides the classifier's refusal, so it is the one field that can
+    # corrupt ordinary prose. It is NOT pinned to a count: /add-term adds forced
+    # terms from other repos (Ninthroot, 2026-08-13), and a hardcoded number fails
+    # for a data change nobody running this suite made. The guards that carry the
+    # meaning are behavioural and live below plus in the corpus sweep [9].
     forced = {t.correct: t.force for t in terms if t.force}
-    check("exactly two terms use force:", len(forced) == 2, f"got: {forced}")
-    check("ActiveCampaign forces 'active campaign'",
-          "active campaign" in forced.get("ActiveCampaign", []))
-    check("fran-dash forces 'fran dash'",
-          "fran dash" in forced.get("fran-dash", []))
+    check("the two measured forces are still present",
+          "active campaign" in forced.get("ActiveCampaign", [])
+          and "fran dash" in forced.get("fran-dash", []), f"got: {forced}")
+
+    # force: is only justified where the classifier would actually refuse. Forcing
+    # a non-risky variant is dead weight that reads as a vouched-for exception.
+    for name, variants in forced.items():
+        pointless = [v for v in variants if not is_risky(v)]
+        check(f"{name} forces only variants the classifier refuses",
+              not pointless, f"needlessly forced: {pointless}")
 
     # Nothing risky should be applied except the two forced phrases.
     for t in terms:
