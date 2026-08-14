@@ -41,6 +41,8 @@ terms:
       - bookq           #   4
       - book io         # plan's original example
       - book eoe        # reported by Cenay
+      - bukio  # 2026-08-13 Art meeting
+      - buckio  # 2026-08-13 Art meeting
     identifier_prefix: bookeo_   # rewrites bookio_product_groups -> bookeo_product_groups
     # NOT listed, deliberately — all ordinary English, all legitimate in a
     # booking-software meeting: booking (259), booked (73), bookings (65),
