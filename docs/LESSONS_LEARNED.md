@@ -1,15 +1,40 @@
 # Lessons Learned
 
-_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — added the 2026-08-13 entry: shared prompt constants have multiple callers, stub the expensive call not the path, verification runs corrupt an audit log_
+_Last updated 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — added the stale-NOT-BUILT-warning lesson and the pinned-count test lesson_
 
 <details>
-<summary>📜 <strong>Stamp history</strong> — the 1 previous update (older ones: <code>history/LESSONS_LEARNED-stamp-history.md</code>)</summary>
+<summary>📜 <strong>Stamp history</strong> — the 2 previous updates (older ones: <code>history/LESSONS_LEARNED-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — added the 2026-08-13 entry: shared prompt constants have multiple callers, stub the expensive call not the path, verification runs corrupt an audit log_
 - _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added three lessons: four defects all found by running not reading, the engine's total failure on non-English names, and the one-meeting generalisation that produced a wrong plan finding._
 
 </details>
 
 Running log of non-obvious failures and how we diagnosed/fixed them. Append new entries at the top.
+
+---
+
+## 2026-08-13 (later) — A doc's "verified" warning outlived the thing it warned about
+
+### Workflow: a ⚠️ NOT BUILT claim needs a re-check date, not just a verification date
+
+`TODOS.md` and `NEXT_STEPS.md` carried a loud, well-evidenced warning that `/add-term` did not exist — quoting the exact `find` that returned nothing. `/add-term` was then built the same day, and the warning stayed. A `/resume` briefing read those docs and reported the tool as unbuilt to the person who had just built it, listing it as the highest-value next task.
+
+**What made it stick:** the warning was *more* convincing than an ordinary note, because it named its evidence. Nothing about it signalled that the evidence had an expiry. The `find` was true when run and false an hour later.
+
+**The tell that was available and missed:** `/add-term` was sitting in the session's own available-skills list, one line, with an accurate description. A tool's presence in the live tool roster is current state; a doc is a claim about the past. **When those disagree, the roster wins** — and the disagreement is worth checking *before* briefing off the doc, not after being corrected.
+
+**Practice:** a "does not exist" claim in a doc gets phrased against a cheap re-check (`find …` / `ls …` in backticks so the next reader can just run it), never as settled fact. And any briefing that is about to recommend *building* something should first check whether it already exists — the check costs one command.
+
+### Gotcha: a test that pins a COUNT breaks on data changes made from another repo
+
+`tests/test_terms.py` asserted `len(forced) == 2` — exactly two terms may use `force:`. Reasonable when written; both forced entries were justified by corpus measurement. Then `/add-term` forced `ninth root` from a session in a different repo, and the suite went red for a **data** change, failed by someone who will never run this suite and would not know what to do about it.
+
+**The fix is not a bigger number.** The count was a proxy for "don't sprinkle `force:` around." Replaced with the property actually worth holding: every forced variant must be one the classifier would genuinely refuse, so `force:` can never be decorative. The real safety net was already there and passing — the 84-transcript corpus sweep asserting no ordinary-English word is altered anywhere.
+
+**Negative-tested before trusting it**, per the standing rule: adding a needlessly-forced variant makes it fail with `Ninthroot forces only variants the classifier refuses`. A passing checker that has never failed is indistinguishable from a broken one.
+
+⚠️ **`pytest` is not installed in this repo's `venv`** — `python -m pytest tests/test_terms.py` dies with `No module named pytest`, which reads like a broken suite. It is a plain script: `./venv/bin/python tests/test_terms.py --corpus`. **Without `--corpus` the sweep silently skips**, and that sweep is the one check standing between a bad term entry and corrupted prose across every meeting.
 
 ---
 

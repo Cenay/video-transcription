@@ -1,10 +1,11 @@
 # Next Steps — video-transcription
 
-_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — rewrote the handoff around the live-meeting measurement; added the shared-prompt and dict-key gotchas; expanded /add-term into three concrete pieces after confirming it does not exist_
+_Last updated 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — the term-normalization build is complete; removed the stale NOT-BUILT block for /add-term and both closed measurements, leaving only two rulings and a cleanup_
 
 <details>
-<summary>📜 <strong>Stamp history</strong> — the 2 previous updates (older ones: <code>history/NEXT_STEPS-stamp-history.md</code>)</summary>
+<summary>📜 <strong>Stamp history</strong> — the 3 previous updates (older ones: <code>history/NEXT_STEPS-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — rewrote the handoff around the live-meeting measurement; added the shared-prompt and dict-key gotchas; expanded /add-term into three concrete pieces after confirming it does not exist_
 - _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — rewrote the handoff for step 2 (wiring apply_corrections into pipeline.py:180); added the classifier and possessive gotchas._
 - _Prior: 2026-08-12 19:15 MST_
 
@@ -15,39 +16,31 @@ _Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c9
 
 ## Where We Left Off
 
-**The term corrector is wired in and live.** Steps 1–3 of the build order are shipped: the transcript pass runs at the convergence point ([DEC-004]), and the analysis stage is protected twice — a generated spelling constraint in `ANALYSIS_PROMPT` plus a post-pass over the returned JSON ([DEC-009]). 75 assertions pass, and a real `--from-cache` run publishes `bookeo_` with zero `bookio` while leaving ordinary English untouched.
+**The term corrector is wired in and live.** Build-order **steps 1–3** shipped on 2026-08-13 (`7e7339f`): the transcript pass runs at the convergence point ([DEC-004]), and the analysis stage is protected twice — a generated spelling constraint in `ANALYSIS_PROMPT` plus a post-pass over the returned JSON ([DEC-009]).
 
-**Committed and pushed** as `7e7339f` (2026-08-13). The tree is clean.
+⚠️ **Steps 4 and 5 of `plans/term-normalization.md` are NOT done** — Layer 2 `word_boost` and Layer 4 `custom_spelling`. They are deferred, not cancelled. Do not read "the corrector is live" as "the plan is finished".
+
+**`/add-term` also shipped that day** — command, script, skill prompt, and an unplanned test script. It is **tooling under [DEC-008], not a build-order step**; the numbering belongs to the plan's five layers. Both remaining unknowns closed the same day:
+
+- **The prompt constraint holds against a live model.** Two real meetings ran end-to-end (10:08 and 23:00 MST), 24 transcript-stage corrections applied, and **zero `[ANALYSIS — …]` entries** in `logs/term-corrections.log`. The model invented no wrong terms. That was the last unverified half of [DEC-009].
+- **`/add-term` is in production use, not just built.** Five `chore(terms):` commits landed the same evening, each auto-committing and pushing `config/terms.yml` alone.
+- **The global `~/.claude/CLAUDE.md` present-tense wording is now accurate** — re-checked against the script: absolute default path, explicit pathspec on commit, never `-a`, loud failure with the path it tried.
 
 ## Pick Up Here
 
-**First, read the live-meeting result.** ⚠️ **The one thing not verified is whether the model obeys the spelling constraint** — only that the constraint renders and reaches the API payload. The run against tonight's meeting answers it, and the number to look at is the analysis post-pass report:
+**The next real build is step 4 — Layer 2 `word_boost` at transcription.** Wire-in is specified in `plans/term-normalization.md`: `scripts/transcriber.py`, the `aai.TranscriptionConfig(...)` call in `transcribe_audio()`, adding `word_boost=TERMS.boost_list()` and `boost_param=aai.WordBoost.high`. The case for it is strong — the engine has a **zero-percent** hit rate on `Khurram` and `Cenay`, and names are exactly the `word_boost` payload. It attacks the error upstream instead of repairing it downstream. ⚠️ Unlike steps 1–3, this one **costs money to verify**: `word_boost` changes what AssemblyAI returns, so it cannot be tested `--from-cache` and needs a real transcription run.
 
-- **Silence** (no `⚠️ The ANALYSIS contained wrong terms…` block) → the constraint held. That is the expected and good outcome.
-- **A non-empty report** → the constraint did *not* hold, the post-pass caught it, and the terms it lists are ones the model **invented** rather than heard. Worth reading `logs/term-corrections.log` for the `[ANALYSIS — …]` entry and considering whether the constraint wording needs strengthening.
+Then, smaller and non-blocking:
 
-Either way the published page is correct — the post-pass is the net. The residual is a measurement, not a failure.
+1. **Decide `Nik` vs `nick`** — 46 occurrences, all reading as the person, but ordinary English so the classifier refuses it. Vet with `./venv/bin/python scripts/preview_corrections.py --all --grep nick`, then either add it under `force:` or record it as deliberately excluded (it is already in the NOT-INCLUDED block in `terms.yml`).
+2. **Decide whether corrections also appear on the Notion page**, in addition to `logs/`. Marginal.
+3. **Dead code in `analyzer.py`** — unused `import os`, unused `model` param on `estimate_analysis_cost()`.
 
-**Second, record what that run showed** — in [`TODOS.md`](TODOS.md) (the Active item exists for it) and, if the residual is non-zero, as an amendment to [DEC-009]. The code is already shipped, so this step is measurement and bookkeeping, not a build.
-
-**Third — build `/add-term` ([DEC-008]). It does not exist yet.**
-
-⚠️ **It is easy to believe this is already built, and it is not.** The global `~/.claude/CLAUDE.md` describes it in the **present tense** ("The `/add-term` command — and only that command — commits and pushes its single target file automatically"), and that file loads into every session in every repo. Verified 2026-08-13 by `find /home/cenay/.claude /mnt/k/Code/claude-personal-toolkit -iname "*add-term*"` → **no results**. Nothing exists: no command file, no script, no skill prompt.
-
-Three pieces, per [DEC-008]:
-
-1. **`~/.claude/commands/add-term.md`** — the global slash command, callable from any repo.
-2. **`claude-personal-toolkit/scripts/add-term.py`** — writes to this repo's `config/terms.yml` **by absolute path**, then commits and pushes **that one file only**. Never `git commit -a`, never a sweep of whatever the calling repo left dirty. **Fails loudly with the path it tried** if the file is absent, rather than creating a fresh one — a silently-created empty term list would apply zero corrections while every run reported success.
-3. **A prompt in the `meeting-reconcile` skill** — offer `/add-term` when a reconciliation review corrects a misheard term. This is the piece that actually makes it get used, since that review is where terms are discovered.
-
-**Why this is the highest-value item left.** Terms are found while reviewing a reconciliation in *another* repo (`fran-dash`, `trfaapi.com`). Today that means switching to this repo, hand-editing YAML, and remembering to commit — so in practice the term never gets added and the mishearing recurs in every later meeting. Adding a term should cost one line typed from wherever you are.
-
-⚠️ **When it is built, the present-tense wording in the global `~/.claude/CLAUDE.md` becomes correct rather than aspirational** — worth re-reading that section then to confirm it matches what was actually built.
+**Running the tests:** `./venv/bin/python tests/test_terms.py --corpus` — **82 passed, 0 failed** as of 2026-08-13 23:13 MST. ⚠️ **`pytest` is not installed in `venv`**; the suite is a plain script with its own runner, so `python -m pytest` fails with `No module named pytest`. Pass `--corpus` or the 84-transcript sweep silently skips — and that sweep is the check that proves no ordinary-English word is corrupted.
 
 ## Decisions Needed
 
-- **`Nik` vs `nick`** — `nick` appears on 42 lines across 8 transcripts. Every sample read as the person, but it is ordinary English so the classifier refuses it by default. Vet with `./venv/bin/python scripts/preview_corrections.py --all --grep nick` and decide whether to `force:` it. Small; does not block anything.
-- **Whether corrections also appear on the Notion page**, in addition to `logs/`. Marginal — you review reconciliations anyway, so the page block would only save a manual correction.
+Both are listed under **Pick Up Here** above — `Nik` vs `nick`, and whether corrections also appear on the Notion page. Neither blocks anything.
 
 ## Watch Out For
 
@@ -57,7 +50,9 @@ Three pieces, per [DEC-008]:
 
 ⚠️ **The raw cache at `transcriber.py:59` must stay uncorrected.** Corrections apply downstream only, so the original is always recoverable when a term entry turns out to be wrong. A consequence: a `--from-cache` re-run produces different text than the cache holds. That is by design.
 
-⚠️ **`/add-term` will auto-commit `terms.yml`** when built — a deliberate exception to the no-auto-commit rule, recorded in the global `~/.claude/CLAUDE.md` so a session in another repo does not "fix" it.
+⚠️ **`/add-term` auto-commits and pushes `terms.yml`** — a deliberate exception to the no-auto-commit rule, recorded in the global `~/.claude/CLAUDE.md` so a session in another repo does not "fix" it. Confirmed working 2026-08-13: five commits, one file each.
+
+⚠️ **Never pin a count of `force:` entries in a test.** `tests/test_terms.py` asserted "exactly two terms use `force:`", which `/add-term` broke the moment it forced `ninth root` from another repo — a data change, failing a test the person making it would never run. Replaced with a behavioural check (every forced variant must be one the classifier would actually refuse) plus the corpus sweep. Negative-tested: a decoratively-forced variant does make it fail.
 
 ⚠️ **`ANALYSIS_PROMPT` has more than one caller.** Adding the `{spelling}` placeholder broke `scripts/diagnose_analysis.py` with `KeyError: 'spelling'` — it formats the shared constant itself. Grep for `ANALYSIS_PROMPT` before touching its placeholders.
 
@@ -67,7 +62,8 @@ Three pieces, per [DEC-008]:
 
 ## Queued (unblocked, not yet scheduled)
 
-- Layer 2 `word_boost` and Layer 4 `custom_spelling` — deferred to steps 4 and 5 of the plan's build order. Names are the obvious `word_boost` payload, given the engine's zero-percent hit rate on `Khurram` and `Cenay`.
+- Layer 4 `custom_spelling` — step 5, "only if 1–4 leave residue". ⚠️ Measured caveat from the plan: `custom_spelling` is applied by AssemblyAI to *its own* output and never sees the LLM stage, so on the 2026-07-30 meeting it would have caught **1 occurrence in the transcript and 0 in the summary**. Low expected value.
+- Step 4 `word_boost` is no longer "queued" — it is the recommended next build, promoted to **Pick Up Here** above.
 - Items tracked in [`TODOS.md`](TODOS.md) and [`plans/term-normalization.md`](../plans/term-normalization.md).
 
 ## Blocked / Waiting On

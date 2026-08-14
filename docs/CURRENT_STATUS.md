@@ -1,15 +1,16 @@
 # Current Status — video-transcription
 
-_Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — wired the corrector into pipeline.py and protected the analysis stage two ways; recorded the verification measurements_
+_Last updated 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — recorded that /add-term shipped and is in production use; closed the live-model measurement (two real runs, zero ANALYSIS residual)_
 
 <details>
-<summary>📜 <strong>Stamp history</strong> — the 1 previous update (older ones: <code>history/CURRENT_STATUS-stamp-history.md</code>)</summary>
+<summary>📜 <strong>Stamp history</strong> — the 2 previous updates (older ones: <code>history/CURRENT_STATUS-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — wired the corrector into pipeline.py and protected the analysis stage two ways; recorded the verification measurements_
 - _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — term corrector built and tested (config/terms.yml, scripts/terms.py, preview tool, 56-assertion suite); added the 83-transcript corpus measurement._
 
 </details>
 
-**Last Updated:** 2026-08-13 12:22 MST
+**Last Updated:** 2026-08-14 00:28 MST
 
 ## What's Done
 
@@ -27,6 +28,8 @@ _Last updated 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c9
   - `scripts/analyzer.py` — `spelling_constraint()` renders `config/terms.yml` into `ANALYSIS_PROMPT`, so the prompt can never drift from the term list.
   - `scripts/pipeline.py` — `correct_structure()` walks the analysis JSON afterwards. **It should normally find nothing**; anything it reports is a term the model *invented* ([DEC-009]).
   - `tests/test_terms.py` — 19 new assertions, **75 total, 0 failures**.
+- **`/add-term` built, tested and in production use (2026-08-13)** — tooling under [DEC-008], *not* a build-order step (steps 4 and 5 are `word_boost` and `custom_spelling`, both still outstanding). All three designed pieces plus an unplanned `test-add-term.py`, in `claude-personal-toolkit`. The script writes `config/terms.yml` by absolute path, rolls the file back from a backup if the edited list fails to reload, and commits with an explicit pathspec — never `-a`. Five `chore(terms):` commits landed the same evening, each pushing that one file. Details in [`TODOS.md`](TODOS.md) → Completed.
+- **Test suite now 82 assertions, 0 failures** (`./venv/bin/python tests/test_terms.py --corpus`). The count of `force:` entries is no longer pinned — see [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md).
 
 ### What the corpus measurement showed
 
@@ -55,13 +58,25 @@ Measured on a real `--from-cache` pass over a cached 126-minute meeting (free �
 
 The analysis seam was verified separately by stubbing the Claude call with a poisoned analysis and running the real `process_video()`: 0 `bookio` reached Notion, `bookio_product_groups` → `bookeo_product_groups`, `_usage` and schema keys intact.
 
+### What the live runs showed — the last open measurement, now closed
+
+Two real meetings ran the full pipeline on 2026-08-13 (`trfa-tamp-new-class-bookeo` 10:08 MST, `trfaapi-deletes-new-bookeo-classes` 23:00 MST):
+
+| check | result |
+|---|---|
+| transcript-stage corrections applied | **24** across the two runs (`bookio`, `karam`/`haram`, `senay`/`cna`, `milosh`, `brandash`, plus forced `active campaign` / `fran dash`) |
+| `[ANALYSIS — …]` entries in `logs/term-corrections.log` | **0** |
+
+✅ **The prompt constraint holds against a live model.** That was the unverified half of [DEC-009]. Because the transcript pass runs first, the analysis input was already clean — so any residual could only have been a term the model *invented*, and it invented none.
+
 ## In Progress
 
-- **Nothing in the working tree.** The one open thread is a **measurement, not a build**: the prompt constraint is proven to render and reach the API payload, but whether Claude obeys it is unverified. Cenay is testing against a live meeting on 2026-08-13, and the residual printed by the analysis post-pass is the number that answers it.
+- **Nothing in the working tree**, and both open measurements are closed.
+- ⚠️ **The plan is not finished.** Build-order steps 1–3 are shipped; **steps 4 (Layer 2 `word_boost`) and 5 (Layer 4 `custom_spelling`) are still outstanding.** Step 4 is the recommended next build and is the first item that **cannot be verified from cache** — it changes what AssemblyAI returns, so it costs a real transcription to test. See [`NEXT_STEPS.md`](NEXT_STEPS.md).
 
 ## Blockers
 
-- None. Two small items remain unruled (`Nik` vs `nick`; whether corrections also appear on the Notion page), neither blocking.
+- None. Two small items remain unruled (`Nik` vs `nick`; whether corrections also appear on the Notion page) plus dead code in `analyzer.py`, none blocking.
 
 <!-- link-doc-refs:start (auto-generated — edit the IDs in prose, not this block) -->
 [DEC-002]: DECISIONS.md#dec-002-term-corrections-are-a-substitution-pass-over-pipeline-output-from-a-hand-authored-list
