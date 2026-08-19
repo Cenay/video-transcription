@@ -43,6 +43,9 @@ terms:
       - book eoe        # reported by Cenay
       - bukio  # 2026-08-13 Art meeting
       - buckio  # 2026-08-13 Art meeting
+      - bookia  # 2026-08-18 Art meeting
+      - buccio  # 2026-08-18 Art meeting
+      - bookie o  # 2026-08-18 Art meeting
     identifier_prefix: bookeo_   # rewrites bookio_product_groups -> bookeo_product_groups
     # NOT listed, deliberately — all ordinary English, all legitimate in a
     # booking-software meeting: booking (259), booked (73), bookings (65),
