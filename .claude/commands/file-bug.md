@@ -76,23 +76,36 @@ surface, when-found from `date`. Ask only about what you truly cannot deduce.
 
 ## Step 2: Create the GitHub Issue
 
-Verify `gh` is authenticated (`gh auth status`) and you are in the repo. Build the body
+### Filing against ANOTHER repo — `--repo owner/name`
+
+**By default the Issue goes to the repo you are standing in**, resolved by `gh` from the git remote. That is right for the common case and nothing changes if you ignore this section.
+
+**Pass `--repo owner/name` when the bug is in a different repo than your working directory.** This is the normal case for an **IMPACT** finding from `/pr-reconcile` — the PR is in one repo and the defect is in the sibling — and it is just as useful when you spot a bug in the other app while working in this one.
+
+⛔ **The mirror must follow the flag.** Step 3 writes `docs/BUG-REPORT.md`; with `--repo` pointing elsewhere the Issue and the ledger entry would land in **different repos**. Both go to the target: the Issue via `--repo`, the ledger entry into that repo's checkout. Resolve the checkout from `.claude/ledger-siblings`, and ⛔ **if the target repo is not checked out, say so and stop** — never file half of a pair.
+
+Verify `gh` is authenticated (`gh auth status`) and you are in the repo (or have resolved `--repo`). Build the body
 as a HEREDOC in the **exact style-guide shape** (blockquote of key facts, then the prose
 sections), then create the issue with the `bug` label, a severity label, and — **for the
 Suspected lane only** — `status:suspected`:
 
 ```bash
 gh issue create \
+  --repo "<owner/name>" `# OPTIONAL — omit to use the current repo` \
   --title "[Bug]: <summary>" \
   --label "bug" \
   --label "severity:<critical|high|medium|low>" \
   --label "status:suspected" `# SUSPECTED LANE ONLY — omit this line for Confirmed` \
+  --label "source:impact" `# IMPACT FINDINGS ONLY — from /pr-reconcile` \
   --body "$(cat <<'EOF'
 > **Status:** Open · **Lane:** <Confirmed|Suspected> · **Severity:** <High>
 > **File:** `path/to/File.ext:118`
-> **Function:** `someFunction()`
+> **Symbol:** `someFunction()` / `SomeClass::someMethod()`
 > **Found by:** <the model that actually ran + its surface, e.g. Claude Opus 5 (Terminal)> · <2026-07-16 18:27 MST>
 > **Transcript:** `<session-id>`
+> **Source:** IMPACT — harvested from `<repo>#<n>` by `/pr-reconcile`, YYYY-MM-DD  `# IMPACT ONLY — omit otherwise`
+> **Trigger:** <what makes it fire, and whether it has fired here yet>  `# IMPACT ONLY — omit otherwise`
+> **Related doc:** `docs/SomeComponent.md` (Issue 3) — omit if none
 
 **Symptom:** …
 
@@ -123,8 +136,16 @@ Notes:
   label" as "confirmed" — read the body.
 - If the labels don't exist yet in the repo, create the canonical set once (colors and
   descriptions in `docs/bug-workflow-rollout.md` → "The canonical label set"):
-  `severity:critical|high|medium|low` and `status:suspected`. Falling back to body-only is
-  acceptable if you can't create labels — the body line is the record either way.
+  `severity:critical|high|medium|low`, `status:suspected` and `source:impact`. Falling back
+  to body-only is acceptable if you can't create labels — the body line is the record either way.
+- ⛔ **A missing label must NEVER fail the filing.** Labels are per-repo GitHub state and
+  nothing propagates them — `sync-shared.sh` copies files, not labels — so a fresh repo has
+  none of them. `gh issue create` errors on an unknown label, so **create-if-missing, else
+  drop the label and keep the body line.**
+- ⛔ **The body line is authoritative; the label is a filterable index over it.** An Issue
+  Form cannot apply a label conditionally on a dropdown, so anything filed through the
+  browser has the body only. **Never read "no `source:impact` label" as "not an IMPACT
+  finding"** — read the `Source:` line, exactly as with the lane.
 - Prefer this direct `gh issue create` path (it lets you file non-interactively). The
   `.github/ISSUE_TEMPLATE/bug_report.yml` form is the equivalent path for the web UI /
   teammates who don't use Claude Code.

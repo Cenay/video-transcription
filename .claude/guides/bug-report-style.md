@@ -44,11 +44,13 @@ Each bug is an H2 heading, followed by a blockquote of key facts, followed by pr
 ```md
 ## BUG-YYYY-MM-DD-NNN — Short imperative summary of the defect
 
-> **Status:** Open · **Severity:** High
+> **Status:** Open · **Lane:** Confirmed · **Severity:** High
 > **File:** `path/to/SomeFile.ext:118` (relative to repo root)
 > **Symbol:** `someFunction()` / `SomeClass::someMethod()`
 > **Found by:** Claude Opus 5 (Terminal) · 2026-07-14 14:30 ET
 > **Transcript:** `a54150ad-e72d-412b-8b27-c756543bb277`
+> **Source:** IMPACT — harvested from `TRFA-API#20` by `/pr-reconcile`, 2026-08-14
+> **Trigger:** fires when the drop-column migration runs here — not yet run
 > **Related doc:** `docs/SomeComponent.md` (Issue 3) — omit if none
 
 **Symptom:** What a developer or user actually observes. Externally visible behaviour, not internals.
@@ -69,6 +71,21 @@ Why the code is wrong. Quote the offending line(s) with a `// line N` comment.
 
 **Suggested fix:** What to change, and what to check before changing it.
 ```
+
+### ⛔ This is the SUPERSET template — every field, marked with where it applies
+
+**One canonical field list, ruled 2026-08-14.** `/file-bug`'s heredoc pastes the same shape into `gh issue create`, and ⚠️ **the two had already drifted three ways before anyone noticed** — `Lane:` existed only in the command, `Related doc:` only here, and the same field was called `Symbol:` here and `Function:` there, so a grep for either silently missed every entry filed the other way. **Omit a field that does not apply; never rename one.**
+
+| field | applies to |
+|---|---|
+| `Status:` `Severity:` `File:` `Symbol:` `Found by:` `Transcript:` | **both paths, required** |
+| `Lane:` | **GitHub Issue only.** In this ledger the lane is already carried by the ID prefix (`BUG-` / `SUSP-`) and by which section the entry sits in. ⚠️ **If it appears here anyway, and it disagrees with the prefix, the PREFIX WINS.** |
+| `Source:` `Trigger:` | **IMPACT findings only** — entries produced by `/pr-reconcile` from another repo's merged PR. See below. |
+| `Related doc:` | omit if none |
+
+**`Source:` and `Trigger:` — for a defect found by harvesting another repo's PR.** `Source:` records the provenance (*which PR, which tool, when*); `Trigger:` records what makes the breakage fire and whether it has fired here yet.
+
+★ **`Trigger:` is what keeps such an entry honest.** An IMPACT entry often sits in the confirmed lane with a Reproduce step that does not *currently* reproduce — because the change has not been deployed here. Without the trigger that reads as a bad entry; with it, it reads as **fix this before you migrate**, which is the decision the reader actually faces.
 
 ## Field rules
 

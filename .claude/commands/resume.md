@@ -35,6 +35,26 @@ gh pr status 2>/dev/null      # "Requesting a code review from you" section, thi
 - **`gh` missing, not authenticated, no network, or the call errors?** One line, or stay silent, and continue. Same rule as the freshness check: **this must never block the briefing**, and it must never be the reason a `/resume` feels slow. It is a courtesy check, not a gate.
 - **Nothing pending?** Say nothing at all. An empty review queue is not news.
 
+## Step 1c: Check whether any MERGED PR is still unharvested
+
+⚠️ **Step 1b cannot see these, by construction** — it reads *"Requesting a code review from you"*, which is **open** PRs. A teammate's decisions arrive in PRs that are already **merged**, and under the single-writer rule those decisions are unrecorded until someone harvests them. ✅ **Measured 2026-08-14: five merged PRs went unharvested for up to twelve days**, because the only channel surfacing them was GitHub notification mail — and email here is a deliberately once-a-day channel, so it cannot carry anything time-sensitive.
+
+**Which PRs are unharvested is derived — there is no state file.** Harvest notes are kept indefinitely at `<docs-root>/intake/prs/YYYY-MM-DD-<repo>-pr<n>-reconciliation.md`, so their filenames *are* the record:
+
+```bash
+# the SET of harvested numbers (not a high-water mark — backlogs are sparse)
+ls docs/intake/prs/*-pr*-reconciliation.md 2>/dev/null | sed -E 's/.*-pr([0-9]+)-.*/\1/' | sort -n
+# merged PRs in each sibling named by .claude/ledger-siblings, above the floor
+gh pr list --repo <owner/name> --state merged --json number,title,author,mergedAt
+```
+
+- **Scope it to the siblings named in `.claude/ledger-siblings`** — the repos that share a decision series. ⛔ **Not every repo**; that is the noise Step 1b rightly avoids.
+- ⛔ **A floor is required.** Without one the query reaches back years — ✅ an unfloored run returned 20 PRs back to 2023. The floor is the earliest PR worth harvesting (currently `TRFA-API#20`).
+- **Exclude the user's own PRs.** She lands her results in the ledgers before pushing, so they are harvested by construction.
+- **Report the count with titles**, above the next-steps list, and recommend `/pr-reconcile --since`. **Show the titles** so the judgement stays with the reader — a raw number alone eventually trains her to ignore it.
+- ⛔ **Warn, never auto-run.** This command only reads.
+- **Nothing unharvested, or `gh` unavailable?** One line, or silence, and continue. Never a gate.
+
 ## Step 2: Load Context
 
 Read the following files (skip any that don't exist). `<DOCS>` is `docs/` for projects under `/mnt/k/Code/`, or `.cloaked/docs/` for client sites under `/mnt/k/_Sites/`:
