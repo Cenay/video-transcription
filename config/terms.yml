@@ -124,6 +124,13 @@ terms:
     force:
       - ninth root
 
+  # ------------------------------------------------------------------- FDD --
+  # Added 2026-08-18 via /add-term.
+  - correct: FDD
+    heard:
+      - ftd
+      - ftds  # 2026-08-18 Art meeting — Franchise Disclosure Document
+
 # ---------------------------------------------------------------------------
 # DELIBERATELY NOT INCLUDED — each of these was measured and left out. Recorded
 # so nobody "helpfully" adds them later without knowing why.
