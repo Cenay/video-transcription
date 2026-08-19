@@ -46,6 +46,8 @@ terms:
       - bookia  # 2026-08-18 Art meeting
       - buccio  # 2026-08-18 Art meeting
       - bookie o  # 2026-08-18 Art meeting
+      - bookill  # 2026-08-19 Art meeting: 'Bookill's', 'Lookio'
+      - lookio  # 2026-08-19 Art meeting: 'Bookill's', 'Lookio'
     identifier_prefix: bookeo_   # rewrites bookio_product_groups -> bookeo_product_groups
     # NOT listed, deliberately — all ordinary English, all legitimate in a
     # booking-software meeting: booking (259), booked (73), bookings (65),
