@@ -1,13 +1,13 @@
 # Next Steps — video-transcription
 
-_Last updated 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — the term-normalization build is complete; removed the stale NOT-BUILT block for /add-term and both closed measurements, leaving only two rulings and a cleanup_
+_Last updated 2026-08-19 15:27 MST by an AI session · transcript: `4325eefc-3918-4756-9846-cdc2fe7683cd` — **queued the `declined:` list** (raised by Cenay 2026-08-19; full sketch in `docs/TODOS.md` → Active). ⛔ **The check belongs at PROPOSAL time — the reconcile skills' `/add-term` offer — not only inside `add-term.py`**, because what costs Cenay time is being asked again, not the write being blocked. ⚠️ **It should exit 0, not 2**: a recorded decline is a satisfied precondition, not an error._
 
 <details>
 <summary>📜 <strong>Stamp history</strong> — the 3 previous updates (older ones: <code>history/NEXT_STEPS-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — the term-normalization build is complete; removed the stale NOT-BUILT block for /add-term and both closed measurements, leaving only two rulings and a cleanup_
 - _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — rewrote the handoff around the live-meeting measurement; added the shared-prompt and dict-key gotchas; expanded /add-term into three concrete pieces after confirming it does not exist_
 - _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — rewrote the handoff for step 2 (wiring apply_corrections into pipeline.py:180); added the classifier and possessive gotchas._
-- _Prior: 2026-08-12 19:15 MST_
 
 </details>
 
@@ -62,6 +62,7 @@ Both are listed under **Pick Up Here** above — `Nik` vs `nick`, and whether co
 
 ## Queued (unblocked, not yet scheduled)
 
+- **A `declined:` list, so a ruled-against variant is never re-proposed** — raised by Cenay 2026-08-19 after `sine` → `Cenay` came back for the third or fourth time. ⛔ **The cost is the ASK, not the write**, so the check belongs where the variant is *proposed* (the reconcile skills' `/add-term` offer), not only inside `add-term.py`. ⚠️ **The place already exists and is not the problem** — ✅ `config/terms.yml:159`'s `DELIBERATELY NOT INCLUDED` block holds exactly this reasoning, and `add-term.py` preserves it. ⛔ **Nothing reads it**, so it is prose, not a guard. ★ **The job is therefore to promote that block to real YAML, migrating its five measured entries — not to invent a new mechanism.** Full sketch in [`TODOS.md`](TODOS.md) → Active.
 - Layer 4 `custom_spelling` — step 5, "only if 1–4 leave residue". ⚠️ Measured caveat from the plan: `custom_spelling` is applied by AssemblyAI to *its own* output and never sees the LLM stage, so on the 2026-07-30 meeting it would have caught **1 occurrence in the transcript and 0 in the summary**. Low expected value.
 - Step 4 `word_boost` is no longer "queued" — it is the recommended next build, promoted to **Pick Up Here** above.
 - Items tracked in [`TODOS.md`](TODOS.md) and [`plans/term-normalization.md`](../plans/term-normalization.md).

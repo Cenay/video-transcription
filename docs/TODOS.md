@@ -1,13 +1,13 @@
 # TODOs — video-transcription
 
-_Last updated 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — moved /add-term and the live-model confirmation to Completed; both shipped 2026-08-13_
+_Last updated 2026-08-19 15:27 MST by an AI session · transcript: `4325eefc-3918-4756-9846-cdc2fe7683cd` — **new Active item: a `declined:` list, raised by Cenay after `sine` → `Cenay` was proposed and declined for the third or fourth time.** ⛔ **The cost being paid is the ASK, not the write**, so the check belongs where a variant is *proposed*, not only where it is written. ★ **Two kinds of "no" are conflated and only the wrong one persists** — the classifier's refusal is mechanical and fires forever; Cenay's decline is a ruling, made once, and evaporates. ★ **It also gives `Nik` vs `nick` somewhere to record "deliberately excluded"**, an option that entry already offers with nowhere to write it. Added from a `fran-dash` meeting reconciliation, which is where the gap is felt._
 
 <details>
 <summary>📜 <strong>Stamp history</strong> — the 3 previous updates (older ones: <code>history/TODOS-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — moved /add-term and the live-model confirmation to Completed; both shipped 2026-08-13_
 - _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — moved the wire-in and analysis-stage items to Completed; added the live-model confirmation item; flagged /add-term as verified-not-built_
 - _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added five Active items: wire the corrector, decide Nik/nick, protect the analysis stage, build /add-term, Notion-block question._
-- _Prior: 2026-07-31 02:19 MST_
 
 </details>
 
@@ -25,6 +25,29 @@ The next real build in `plans/term-normalization.md`, and the strongest remainin
 
 ### Build step 5 — Layer 4 `custom_spelling` (only if 1–4 leave residue)
 Deliberately last, and possibly never. Measured on the 2026-07-30 meeting it would have caught **1 occurrence in the transcript and 0 in the summary**, because AssemblyAI applies it to its own output and it never sees the LLM stage.
+
+### Build a `declined:` list — so a variant Cenay has ruled against is never proposed again
+**Raised by Cenay 2026-08-19**, after `sine` → `Cenay` came back for the **third or fourth** time: *"We should stop trying it if we've ruled it."*
+
+**The loop as it stands.** A reconciliation session in another repo hits the mishearing, offers `/add-term Cenay sine`, the classifier refuses it (all-ordinary-words — correct), the session relays the refusal, Cenay declines. **Nothing anywhere records that she declined.** The next session repeats all four steps, because from its point of view this is a fresh mishearing it just spotted.
+
+⛔ **The cost being paid is the ASK, not the write** — so a guard that only fires when something is written is the wrong guard. **The check has to happen where the variant is PROPOSED**, which is `/add-term`'s offer step in the reconcile skills, not just inside `add-term.py`.
+
+★ **Two different kinds of "no" are being conflated, and only one of them is recorded.** The classifier's refusal is **mechanical and stateless** — `sine` is ordinary English, and it will refuse it identically forever. Cenay's decline is a **ruling**, made once, and it is the one that should persist. Today the mechanical one fires every time and the human one evaporates.
+
+⚠️ **The place to record it ALREADY EXISTS — and that is the sharpest fact here.** ✅ `config/terms.yml` line 159 carries a **`DELIBERATELY NOT INCLUDED`** block, holding exactly this reasoning for `Nik`/`nick`, `Jake`, `Art`/`Arthur`, `TRFA` and others, and `add-term.py` deliberately round-trips it rather than destroying it. ⛔ **But NOTHING READS IT** — ✅ verified: the only two hits in `add-term.py` are about *preserving comments*, not consulting them. **It is a comment block, so a decline written there is invisible to the next session.**
+
+★ **So this is not "invent a place to record declines" — it is "make the place that already exists machine-readable."** A much smaller job, and it explains why the loop survives despite the block being there: `sine` could have been written into that comment today and the next session would still have proposed it.
+
+**Sketch (not a spec — decide the shape when building):**
+- Promote the block to real YAML — a `declined:` key per term, each entry carrying the variant, the date, and one line of reason. ⛔ **Migrate the existing five entries rather than starting fresh**; they are measured findings (`Jake`'s near-misses, `TRFA`'s 169 correct occurrences) and losing them to a rewrite would be the whole point of the block, undone.
+- `add-term.py` checks it **first** and exits **0** with *"`sine` was declined for `Cenay` on 2026-08-19 — not re-proposing"*, distinct from the exit-2 refusal. ⚠️ **Exit 0, not 2**: this is a satisfied precondition, not an error, and a caller should not treat it as a failure.
+- `--force` still overrides, since a ruling can be revisited — but it should say it is overriding a recorded decline, not a classifier refusal.
+- The reconcile skills read it before offering, which is what actually stops the question reaching her.
+
+★ **This also gives the `Nik` vs `nick` item below its ending.** That entry offers *"or leave it documented as deliberately excluded"* — and it **is** so documented, in the comment block. ⛔ **Documenting it there did not stop it being re-raised**, which is precisely the evidence that the block needs to be data rather than prose.
+
+**Seed it with what is already ruled:** `sine` → `Cenay` (2026-08-19). ⚠️ **Candidates, not yet ruled — ask before seeding:** `fever` → `Fiverr`, `book you` / `bookie oh` → `Bookeo` (noted 2026-08-19; all three are all-ordinary-words and would be refused anyway, but that is the refusal firing, not a decline being remembered).
 
 ### Decide `Nik` vs `nick`
 `nick` appears on 42 lines across 8 cached transcripts. Every sample reads as the person, but it is ordinary English so the classifier refuses it by default. Vet with `./venv/bin/python scripts/preview_corrections.py --all --grep nick`, then either add it to `force:` in `config/terms.yml` or leave it documented as deliberately excluded.
