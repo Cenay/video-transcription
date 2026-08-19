@@ -121,8 +121,18 @@ terms:
   - correct: Ninthroot
     heard:
       - ninth root
+      - ninth route  # 6 manglings in the 2026-08-18 Art meeting alone
+      - 9th route  # 6 manglings in the 2026-08-18 Art meeting alone
+      - nine through  # 6 manglings in the 2026-08-18 Art meeting alone
+      - knight through  # 6 manglings in the 2026-08-18 Art meeting alone
+      - 9th grid  # 6 manglings in the 2026-08-18 Art meeting alone
     force:
       - ninth root
+      - ninth route
+      - 9th route
+      - nine through
+      - knight through
+      - 9th grid
 
   # ------------------------------------------------------------------- FDD --
   # Added 2026-08-18 via /add-term.
