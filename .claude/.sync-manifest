@@ -1,6 +1,6 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-08-20 11:48 MST
+# Last synced: 2026-08-20 14:06 MST
 e1fad792a169d0789d2b166a7d14cbab22a6adfbece64adb4b17f9b330951a68  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 c0e61ad160d419f0190134863f84a1cbbe655886d2ab828f1d4f508986a2a0ad  .claude/skills/wrap-up/SKILL.md
 ab6dafc437cf44a3879f84fb94eaa4b6ffc3fc758cd82bcec668942e92be5f09  .claude/skills/next-step/SKILL.md
@@ -17,6 +17,6 @@ ddc89ae045c104214aed38f677ae7ecb7e0fe6dd8e74b6fd68ea876e064cd734  .claude/script
 6f930c6d8e189c1ae2481c953ac4ec6ce01593ecdaf1617b6ce3593799e6e2b9  .claude/scripts/stamp-doc.py
 330476e777daccd9fa520d71d94f76c4f850ebfe73b8f8de1be25a0f62678c97  .claude/scripts/ledger_contract.py
 80134380e60c02a26276de9b568769ee3fc784211e48b9d5bbea7e2db1342bf4  .claude/scripts/write-entry.py
-dcae5b0d7ddc80bbd081fb7528039f9d2dc05281ed0e84fd64fe7dcb015c6cca  .claude/scripts/ledger-lint.py
+78b7068f46bda80794891c45dd2b3167104e07553d4ce5c74c498f08290dd05b  .claude/scripts/ledger-lint.py
 b485dfa0921abcc032fc04aec1e82bde4e8637ed86def76c104eea66bfb87d7e  .github/ISSUE_TEMPLATE/bug_report.yml
 4b5a0f7a5fbd0182f52030e9589a385533c906d0948c268be76efa433807923b  .github/ISSUE_TEMPLATE/config.yml

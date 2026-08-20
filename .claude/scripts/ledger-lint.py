@@ -98,6 +98,53 @@ SKIP_RE = re.compile(r"<!--\s*ledger-lint:\s*ignore-paths\s*-->")
 # switched-off check with extra steps.
 ADOPTING_RE = re.compile(r"<!--\s*ledger-lint:\s*adopting\b[^>]*-->")
 
+# ⚠️ TWO DEFECTS, BOTH MEASURED 2026-08-20 WHILE EXEMPTING trfaapi.com, both
+# fixed here rather than worked around. See [DEC-050].
+#
+# (a) A WRAPPED MARKER FAILS OPEN. `ADOPTING_RE` matches the whole comment on a
+#     SINGLE line. A marker written across several lines for readability matches
+#     nothing — and ⛔ a ledger carrying an inert marker lints BYTE-IDENTICALLY
+#     to one carrying no marker, so there is no signal that it did nothing. It
+#     was caught only by running a control with the marker stripped and getting
+#     the same output. `ADOPTING_OPEN_RE` finds the opener so the inert case
+#     becomes a loud error instead of silence. Fails LOUD, never open.
+#
+# (b) A LEDGER COULD NOT DESCRIBE THE MARKER WITHOUT ARMING IT. The scan read
+#     raw lines, so writing the marker inside backticks — in the very entry
+#     explaining what it does — switched it on for that ledger, which then
+#     failed with "the marker has outlived its purpose". ★ `check-desk.py`
+#     already learned this exact lesson and strips fences and inline code before
+#     any scan, because a desk quotes its own markup constantly. A ledger does
+#     too. `_scannable()` copies that behavior.
+ADOPTING_OPEN_RE = re.compile(r"<!--[^>]*\bledger-lint:\s*adopting\b")
+INLINE_CODE_RE = re.compile(r"`+[^`]*`+")
+
+
+def _scannable(lines):
+    """`lines` with fenced blocks blanked and inline code stripped.
+
+    Used ONLY for marker detection. A ledger legitimately quotes the marker when
+    documenting it, and a quoted marker must not arm the real thing.
+    """
+    fences = fenced_lines(lines)
+    return ["" if n in fences else INLINE_CODE_RE.sub(" ", l)
+            for n, l in enumerate(lines)]
+
+
+def adopting_state(lines):
+    """-> (armed, wrapped) — the ONE place the marker is detected.
+
+    It was previously scanned for in three independent places, which is how the
+    two defects above could be fixed in one and left in the others. Returning
+    both answers together makes "armed" and "inert" a single decision.
+    """
+    scan = _scannable(lines)
+    armed = any(ADOPTING_RE.search(l) for l in scan)
+    wrapped = [f"line {n + 1}: {l.strip()[:72]}"
+               for n, l in enumerate(scan)
+               if ADOPTING_OPEN_RE.search(l) and not ADOPTING_RE.search(l)]
+    return armed, wrapped
+
 
 class Report:
     def __init__(self, quiet):
@@ -209,7 +256,7 @@ def check_shape(r, lines, entries):
     NOT CHECKED: whether a field's CONTENT is any good. An entry can carry all
     eight fields, in order, and say nothing worth reading.
     """
-    adopting = any(ADOPTING_RE.search(l) for l in lines)
+    adopting, _ = adopting_state(lines)
     required = list(REQUIRED_FIELDS)
     reg_required = [n for n, req in REGISTRY_FIELDS if req]
 
@@ -414,7 +461,7 @@ def check_tldr(r, lines, entries):
                              f"{TLDR_MAX_WORDS}) — it may have drifted back into the "
                              f"background it replaces")
 
-    adopting = any(ADOPTING_RE.search(l) for l in lines)
+    adopting, _ = adopting_state(lines)
 
     if adopting and not missing:
         # Nothing outstanding HERE — but the marker covers check 9 too, and that
@@ -689,11 +736,24 @@ def main():
     # its purpose can only be judged after both have run. ⚠️ Judging it inside
     # check 8 made a ledger that had finished its restatements but not its
     # reshaping fail for carrying a marker it still needed.
-    if any(ADOPTING_RE.search(l) for l in lines) and not outstanding:
+    armed, wrapped = adopting_state(lines)
+    if armed and not outstanding:
         r.fail("the adopting marker has outlived its purpose",
                "every entry now carries a restatement AND conforms to the template — "
-               "delete the `<!-- ledger-lint: adopting -->` marker so both checks "
-               "enforce again")
+               "delete the adopting marker so both checks enforce again")
+
+    # ⛔ REPORTED LAST AND UNCONDITIONALLY, because it is the one finding here
+    # that fails OPEN. Every other check goes red when something is wrong; a
+    # wrapped marker goes SILENT, and silence reads as "the marker is working".
+    # Reported even when `armed` is true — a ledger can carry a good marker and
+    # a broken second one, and the good one would hide the broken one entirely.
+    if wrapped:
+        r.fail("the adopting marker is WRAPPED and therefore INERT",
+               "the whole comment must sit on ONE line — as written it suppresses "
+               "nothing, and this ledger lints identically to one with no marker "
+               "at all. Put the marker on a single line and move any explanation "
+               "into a separate comment beside it",
+               wrapped)
 
     print()
     if r.failed:
