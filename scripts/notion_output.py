@@ -201,25 +201,109 @@ def build_meeting_blocks(
     return blocks, transcript_blocks
 
 
-def _append_body(page_id: str, blocks: list, transcript_blocks: list) -> None:
+CORRECTIONS_TOGGLE_TITLE = "🔤 Term corrections applied by the pipeline"
+
+
+def build_correction_blocks(corrections: list) -> list:
+    """Build the children of the term-corrections toggle ([DEC-010]).
+
+    `corrections` is a list of dicts — {term, variant, count, forced, stage} —
+    as `pipeline.py` records them. An EMPTY list is not the same as no list:
+    empty means the corrector ran and found nothing, and the block says so.
+    Silence would otherwise mean either "nothing there" or "nobody looked".
+
+    The page is the interface to `meeting-reconcile`, not just a human artifact,
+    so what the pipeline rewrote has to be readable from the page itself — the
+    `logs/` copy is invisible to the session that reads this.
+    """
+    children = [{
+        "type": "paragraph",
+        "paragraph": {"rich_text": [{"type": "text", "text": {"content": (
+            "The transcript above is NOT raw speech-to-text. These domain terms "
+            "were misheard and substituted automatically before the analysis ran, "
+            "so a quote here may differ from the sounds spoken. The uncorrected "
+            "transcript is kept in this repo's transcribe-cache."
+        )}}]}
+    }]
+
+    if not corrections:
+        children.append({
+            "type": "paragraph",
+            "paragraph": {"rich_text": [{"type": "text", "text": {"content":
+                "✅ No term corrections were applied to this meeting."
+            }}]}
+        })
+        return children
+
+    transcript_rows = [c for c in corrections if c.get("stage") != "analysis"]
+    analysis_rows = [c for c in corrections if c.get("stage") == "analysis"]
+
+    for label, rows, note in (
+        ("Transcript", transcript_rows, ""),
+        ("Analysis (⚠️ the model wrote these; the transcript did not contain them)",
+         analysis_rows, " ⚠️"),
+    ):
+        if not rows:
+            continue
+        children.append({
+            "type": "paragraph",
+            "paragraph": {"rich_text": [{
+                "type": "text",
+                "text": {"content": label},
+                "annotations": {"bold": True},
+            }]}
+        })
+        for c in sorted(rows, key=lambda r: -r.get("count", 0)):
+            flag = " [forced]" if c.get("forced") else ""
+            line = (f"\"{c['variant']}\" → {c['term']} — "
+                    f"{c.get('count', 0)}×{flag}{note}")
+            children.append({
+                "type": "bulleted_list_item",
+                "bulleted_list_item": {
+                    "rich_text": [{"type": "text", "text": {"content": line[:1900]}}]
+                }
+            })
+
+    return children
+
+
+def _append_body(
+    page_id: str,
+    blocks: list,
+    transcript_blocks: list,
+    correction_blocks: list | None = None,
+) -> None:
     """Append body blocks to a page, then the transcript inside a collapsible
-    toggle. Notion limits to 100 blocks per request, so batch."""
+    toggle, then the corrections in a toggle of its own directly beneath it.
+    Notion limits to 100 blocks per request, so batch."""
     for i in range(0, len(blocks), 100):
         notion.blocks.children.append(page_id, children=blocks[i:i+100])
 
     # Add the transcript inside a collapsible Heading 3 toggle so it stays
     # hidden by default. Create the toggle heading first, then nest the
     # transcript paragraphs as its children (100 per request).
-    toggle_resp = notion.blocks.children.append(page_id, children=[{
+    _append_toggle(page_id, "Transcript", transcript_blocks)
+
+    # The corrections sit in the same kind of toggle immediately below, so the
+    # thing that explains the transcript lives next to the transcript. `None`
+    # means the caller had nothing to say; `[]` means it looked and found none.
+    if correction_blocks is not None:
+        _append_toggle(page_id, CORRECTIONS_TOGGLE_TITLE, correction_blocks)
+
+
+def _append_toggle(page_id: str, title: str, children: list) -> str:
+    """Create a collapsed Heading 3 toggle and nest `children` under it."""
+    resp = notion.blocks.children.append(page_id, children=[{
         "type": "heading_3",
         "heading_3": {
-            "rich_text": [{"text": {"content": "Transcript"}}],
+            "rich_text": [{"text": {"content": title}}],
             "is_toggleable": True
         }
     }])
-    toggle_id = toggle_resp["results"][0]["id"]
-    for i in range(0, len(transcript_blocks), 100):
-        notion.blocks.children.append(toggle_id, children=transcript_blocks[i:i+100])
+    toggle_id = resp["results"][0]["id"]
+    for i in range(0, len(children), 100):
+        notion.blocks.children.append(toggle_id, children=children[i:i+100])
+    return toggle_id
 
 
 def create_meeting_page(
@@ -229,10 +313,14 @@ def create_meeting_page(
     analysis: dict,
     transcript: str,
     costs: dict,
-    source_file: str = ""
+    source_file: str = "",
+    corrections: list | None = None,
 ) -> dict:
     """
     Create a Notion page with meeting analysis.
+
+    `corrections` is the term substitutions this run applied — pass `[]` when
+    the corrector ran and found none, `None` only when it did not run at all.
 
     Returns {"url", "page_id"}.
     """
@@ -252,7 +340,10 @@ def create_meeting_page(
     blocks, transcript_blocks = build_meeting_blocks(
         date, duration_minutes, analysis, transcript, costs
     )
-    _append_body(page_id, blocks, transcript_blocks)
+    _append_body(
+        page_id, blocks, transcript_blocks,
+        None if corrections is None else build_correction_blocks(corrections),
+    )
 
     page_url = f"https://notion.so/{page_id.replace('-', '')}"
     return {"url": page_url, "page_id": page_id}
@@ -265,6 +356,7 @@ def repair_meeting_page(
     analysis: dict,
     transcript: str,
     costs: dict,
+    corrections: list | None = None,
 ) -> dict:
     """Rebuild the body of an EXISTING page from a (recovered) analysis dict.
 
@@ -293,7 +385,10 @@ def repair_meeting_page(
     blocks, transcript_blocks = build_meeting_blocks(
         date, duration_minutes, analysis, transcript, costs
     )
-    _append_body(page_id, blocks, transcript_blocks)
+    _append_body(
+        page_id, blocks, transcript_blocks,
+        None if corrections is None else build_correction_blocks(corrections),
+    )
 
     if meeting_url:
         update_meeting_link(page_id, meeting_url)

@@ -210,7 +210,8 @@ def process_video(
         print(report)
         result["transcript"] = transcript_text
         result["corrections"] = [
-            {"term": c.term, "variant": c.variant, "count": c.count, "forced": c.forced}
+            {"term": c.term, "variant": c.variant, "count": c.count,
+             "forced": c.forced, "stage": "transcript"}
             for c in corrections
         ]
         log_path = write_corrections_log(video_path.stem, corrections, report)
@@ -290,7 +291,8 @@ def process_video(
                 report,
             )
             result["analysis_corrections"] = [
-                {"term": c.term, "variant": c.variant, "count": c.count}
+                {"term": c.term, "variant": c.variant, "count": c.count,
+                 "forced": c.forced, "stage": "analysis"}
                 for c in analysis_corrections
             ]
         result["analysis"] = analysis
@@ -321,7 +323,13 @@ def process_video(
             analysis=analysis,
             transcript=transcript_text,
             costs=result["costs"],
-            source_file=video_path.name
+            source_file=video_path.name,
+            # Both passes, on the page itself ([DEC-010]). meeting-reconcile
+            # reads the page, never this repo's logs/, so a correction it
+            # cannot see is a correction that does not exist to it. An empty
+            # list still renders the toggle — "none applied" has to be
+            # distinguishable from "nobody looked".
+            corrections=result["corrections"] + result.get("analysis_corrections", []),
         )
 
         notion_url = notion_result["url"]

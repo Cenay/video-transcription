@@ -1,13 +1,13 @@
 # Next Steps — video-transcription
 
-_Last updated 2026-08-19 15:27 MST by an AI session · transcript: `4325eefc-3918-4756-9846-cdc2fe7683cd` — **queued the `declined:` list** (raised by Cenay 2026-08-19; full sketch in `docs/TODOS.md` → Active). ⛔ **The check belongs at PROPOSAL time — the reconcile skills' `/add-term` offer — not only inside `add-term.py`**, because what costs Cenay time is being asked again, not the write being blocked. ⚠️ **It should exit 0, not 2**: a recorded decline is a satisfied precondition, not an error._
+_Last updated 2026-08-20 11:37 MST by an AI session · transcript: `f0912a53-461b-4861-97e4-931cb2f83ba0` — dropped the settled Notion-page question and flagged the pre-existing Ninthroot test failure _
 
 <details>
 <summary>📜 <strong>Stamp history</strong> — the 3 previous updates (older ones: <code>history/NEXT_STEPS-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-19 15:27 MST by an AI session · transcript: `4325eefc-3918-4756-9846-cdc2fe7683cd` — **queued the `declined:` list** (raised by Cenay 2026-08-19; full sketch in `docs/TODOS.md` → Active). ⛔ **The check belongs at PROPOSAL time — the reconcile skills' `/add-term` offer — not only inside `add-term.py`**, because what costs Cenay time is being asked again, not the write being blocked. ⚠️ **It should exit 0, not 2**: a recorded decline is a satisfied precondition, not an error._
 - _Prior: 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — the term-normalization build is complete; removed the stale NOT-BUILT block for /add-term and both closed measurements, leaving only two rulings and a cleanup_
 - _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — rewrote the handoff around the live-meeting measurement; added the shared-prompt and dict-key gotchas; expanded /add-term into three concrete pieces after confirming it does not exist_
-- _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — rewrote the handoff for step 2 (wiring apply_corrections into pipeline.py:180); added the classifier and possessive gotchas._
 
 </details>
 
@@ -33,14 +33,18 @@ _Last updated 2026-08-19 15:27 MST by an AI session · transcript: `4325eefc-391
 Then, smaller and non-blocking:
 
 1. **Decide `Nik` vs `nick`** — 46 occurrences, all reading as the person, but ordinary English so the classifier refuses it. Vet with `./venv/bin/python scripts/preview_corrections.py --all --grep nick`, then either add it under `force:` or record it as deliberately excluded (it is already in the NOT-INCLUDED block in `terms.yml`).
-2. **Decide whether corrections also appear on the Notion page**, in addition to `logs/`. Marginal.
-3. **Dead code in `analyzer.py`** — unused `import os`, unused `model` param on `estimate_analysis_cost()`.
+2. **Dead code in `analyzer.py`** — unused `import os`, unused `model` param on `estimate_analysis_cost()`.
 
-**Running the tests:** `./venv/bin/python tests/test_terms.py --corpus` — **82 passed, 0 failed** as of 2026-08-13 23:13 MST. ⚠️ **`pytest` is not installed in `venv`**; the suite is a plain script with its own runner, so `python -m pytest` fails with `No module named pytest`. Pass `--corpus` or the 84-transcript sweep silently skips — and that sweep is the check that proves no ordinary-English word is corrupted.
+⚠️ **Two pre-existing test failures in `tests/test_terms.py`, both from term DATA added by `/add-term`, neither from code.** ✅ Verified by `git status` — `config/terms.yml`, `scripts/terms.py` and `tests/test_terms.py` are all clean at HEAD, so both failures predate the 2026-08-20 work.
+
+1. **`Ninthroot forces only variants the classifier refuses`** — *needlessly forced: `['9th route', '9th grid']`*. Both contain `9th`, which is not an ordinary English word, so the classifier already applies them and the `force:` entries are redundant. Cosmetic; drop the two entries and it goes green.
+2. **`no ordinary-English word was altered anywhere in the corpus`** — the `bookie o` variant (added 2026-08-18) consumes one `bookie` occurrence in each of two transcripts. ⚠️ **This one needs a ruling, not a cleanup:** in context *"bookie o underscore"* plainly means `Bookeo`, so the substitution may well be right and the test's blunt count is what is wrong. But this is the exact guard that proves the corrector is not corrupting English, so it should not be left red on a shrug — either narrow the variant, or narrow the test's `DANGEROUS` check and say why.
+
+**Running the tests:** `./venv/bin/python tests/test_terms.py --corpus` (**87 passed, 2 failed** as of 2026-08-20 — the two items above; without `--corpus` it is 86/1) and `./venv/bin/python tests/test_notion_corrections.py` (**16 passed, 0 failed**), which covers the corrections toggle ([DEC-010]) against a stubbed Notion client. ⚠️ **`pytest` is not installed in `venv`**; the suite is a plain script with its own runner, so `python -m pytest` fails with `No module named pytest`. Pass `--corpus` or the 84-transcript sweep silently skips — and that sweep is the check that proves no ordinary-English word is corrupted.
 
 ## Decisions Needed
 
-Both are listed under **Pick Up Here** above — `Nik` vs `nick`, and whether corrections also appear on the Notion page. Neither blocks anything.
+One, listed under **Pick Up Here** above — `Nik` vs `nick`. It blocks nothing. ~~Whether corrections also appear on the Notion page~~ ✅ ruled 2026-08-20 and built ([DEC-010]): a toggle directly under the transcript, carrying both correction passes.
 
 ## Watch Out For
 
@@ -76,4 +80,5 @@ Both are listed under **Pick Up Here** above — `Nik` vs `nick`, and whether co
 [DEC-005]: DECISIONS.md#dec-005-one-flat-term-table-the-code-classifies-risk-not-the-author
 [DEC-008]: DECISIONS.md#dec-008-add-term-will-auto-commit-its-one-file--an-exception-to-the-no-auto-commit-rule
 [DEC-009]: DECISIONS.md#dec-009-the-analysis-stage-is-protected-twice--a-prompt-constraint-and-a-post-pass-and-the-gap-between-them-is-the-measurement
+[DEC-010]: DECISIONS.md#dec-010-the-corrections-also-go-on-the-notion-page-in-a-toggle-directly-under-the-transcript
 <!-- link-doc-refs:end -->

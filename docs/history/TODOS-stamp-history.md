@@ -4,4 +4,6 @@ _Rolled out of `../TODOS.md`'s header. **Verbatim, newest first — moved, never
 
 ---
 
+- _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added five Active items: wire the corrector, decide Nik/nick, protect the analysis stage, build /add-term, Notion-block question._
+
 - _Prior: 2026-07-31 02:19 MST_

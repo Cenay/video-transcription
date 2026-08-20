@@ -1,10 +1,11 @@
 # Current Status — video-transcription
 
-_Last updated 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — recorded that /add-term shipped and is in production use; closed the live-model measurement (two real runs, zero ANALYSIS residual)_
+_Last updated 2026-08-20 11:37 MST by an AI session · transcript: `f0912a53-461b-4861-97e4-931cb2f83ba0` — recorded the corrections toggle ([DEC-010]) and the current test counts _
 
 <details>
-<summary>📜 <strong>Stamp history</strong> — the 2 previous updates (older ones: <code>history/CURRENT_STATUS-stamp-history.md</code>)</summary>
+<summary>📜 <strong>Stamp history</strong> — the 3 previous updates (older ones: <code>history/CURRENT_STATUS-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — recorded that /add-term shipped and is in production use; closed the live-model measurement (two real runs, zero ANALYSIS residual)_
 - _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — wired the corrector into pipeline.py and protected the analysis stage two ways; recorded the verification measurements_
 - _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — term corrector built and tested (config/terms.yml, scripts/terms.py, preview tool, 56-assertion suite); added the 83-transcript corpus measurement._
 
@@ -29,7 +30,8 @@ _Last updated 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47e
   - `scripts/pipeline.py` — `correct_structure()` walks the analysis JSON afterwards. **It should normally find nothing**; anything it reports is a term the model *invented* ([DEC-009]).
   - `tests/test_terms.py` — 19 new assertions, **75 total, 0 failures**.
 - **`/add-term` built, tested and in production use (2026-08-13)** — tooling under [DEC-008], *not* a build-order step (steps 4 and 5 are `word_boost` and `custom_spelling`, both still outstanding). All three designed pieces plus an unplanned `test-add-term.py`, in `claude-personal-toolkit`. The script writes `config/terms.yml` by absolute path, rolls the file back from a backup if the edited list fails to reload, and commits with an explicit pathspec — never `-a`. Five `chore(terms):` commits landed the same evening, each pushing that one file. Details in [`TODOS.md`](TODOS.md) → Completed.
-- **Test suite now 82 assertions, 0 failures** (`./venv/bin/python tests/test_terms.py --corpus`). The count of `force:` entries is no longer pinned — see [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md).
+- **The corrections are visible on the Notion page itself (2026-08-20, [DEC-010]).** `scripts/notion_output.py` renders a collapsed `🔤 Term corrections applied by the pipeline` toggle directly below the transcript toggle, listing every substitution from both passes and stating that the transcript above it is not raw speech-to-text. The `logs/` copy stays; the log answers *"which meetings did a bad term entry touch?"*, the toggle answers *"what was rewritten in this meeting?"* for the reconciliation reviewer. ⚠️ **An empty run still renders the toggle** — silence must not mean both "nothing there" and "nobody looked". `tests/test_notion_corrections.py`, 16 assertions, 0 failures. ⚠️ Not yet seen rendered on a real page.
+- **Test suite: `tests/test_terms.py --corpus` 89 assertions, ⚠️ 2 failing** — `Ninthroot forces only variants the classifier refuses` (redundant `force:` entries) and `no ordinary-English word was altered anywhere in the corpus` (the `bookie o` variant consumes a `bookie` in two transcripts). ⚠️ **Both come from term data added by `/add-term`, not from code** — verified clean at HEAD by `git status`. The second is the corpus safety guard and wants a ruling rather than a cleanup; see [`NEXT_STEPS.md`](NEXT_STEPS.md). `tests/test_notion_corrections.py` — 16 assertions, 0 failures. The count of `force:` entries is no longer pinned — see [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md).
 
 ### What the corpus measurement showed
 
@@ -76,7 +78,7 @@ Two real meetings ran the full pipeline on 2026-08-13 (`trfa-tamp-new-class-book
 
 ## Blockers
 
-- None. Two small items remain unruled (`Nik` vs `nick`; whether corrections also appear on the Notion page) plus dead code in `analyzer.py`, none blocking.
+- None. One small item remains unruled (`Nik` vs `nick`), plus dead code in `analyzer.py` and the redundant `Ninthroot` `force:` entries turning the term suite red. None blocking. Whether corrections also appear on the Notion page is ruled and built ([DEC-010]).
 
 <!-- link-doc-refs:start (auto-generated — edit the IDs in prose, not this block) -->
 [DEC-002]: DECISIONS.md#dec-002-term-corrections-are-a-substitution-pass-over-pipeline-output-from-a-hand-authored-list
@@ -84,4 +86,5 @@ Two real meetings ran the full pipeline on 2026-08-13 (`trfa-tamp-new-class-book
 [DEC-006]: DECISIONS.md#dec-006-every-correction-is-logged-to-logs
 [DEC-008]: DECISIONS.md#dec-008-add-term-will-auto-commit-its-one-file--an-exception-to-the-no-auto-commit-rule
 [DEC-009]: DECISIONS.md#dec-009-the-analysis-stage-is-protected-twice--a-prompt-constraint-and-a-post-pass-and-the-gap-between-them-is-the-measurement
+[DEC-010]: DECISIONS.md#dec-010-the-corrections-also-go-on-the-notion-page-in-a-toggle-directly-under-the-transcript
 <!-- link-doc-refs:end -->

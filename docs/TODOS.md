@@ -1,13 +1,13 @@
 # TODOs — video-transcription
 
-_Last updated 2026-08-19 15:27 MST by an AI session · transcript: `4325eefc-3918-4756-9846-cdc2fe7683cd` — **new Active item: a `declined:` list, raised by Cenay after `sine` → `Cenay` was proposed and declined for the third or fourth time.** ⛔ **The cost being paid is the ASK, not the write**, so the check belongs where a variant is *proposed*, not only where it is written. ★ **Two kinds of "no" are conflated and only the wrong one persists** — the classifier's refusal is mechanical and fires forever; Cenay's decline is a ruling, made once, and evaporates. ★ **It also gives `Nik` vs `nick` somewhere to record "deliberately excluded"**, an option that entry already offers with nowhere to write it. Added from a `fran-dash` meeting reconciliation, which is where the gap is felt._
+_Last updated 2026-08-20 11:37 MST by an AI session · transcript: `f0912a53-461b-4861-97e4-931cb2f83ba0` — closed the Notion-corrections item — [DEC-010] shipped the corrections toggle _
 
 <details>
 <summary>📜 <strong>Stamp history</strong> — the 3 previous updates (older ones: <code>history/TODOS-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-19 15:27 MST by an AI session · transcript: `4325eefc-3918-4756-9846-cdc2fe7683cd` — **new Active item: a `declined:` list, raised by Cenay after `sine` → `Cenay` was proposed and declined for the third or fourth time.** ⛔ **The cost being paid is the ASK, not the write**, so the check belongs where a variant is *proposed*, not only where it is written. ★ **Two kinds of "no" are conflated and only the wrong one persists** — the classifier's refusal is mechanical and fires forever; Cenay's decline is a ruling, made once, and evaporates. ★ **It also gives `Nik` vs `nick` somewhere to record "deliberately excluded"**, an option that entry already offers with nowhere to write it. Added from a `fran-dash` meeting reconciliation, which is where the gap is felt._
 - _Prior: 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — moved /add-term and the live-model confirmation to Completed; both shipped 2026-08-13_
 - _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — moved the wire-in and analysis-stage items to Completed; added the live-model confirmation item; flagged /add-term as verified-not-built_
-- _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added five Active items: wire the corrector, decide Nik/nick, protect the analysis stage, build /add-term, Notion-block question._
 
 </details>
 
@@ -52,9 +52,6 @@ Deliberately last, and possibly never. Measured on the 2026-07-30 meeting it wou
 ### Decide `Nik` vs `nick`
 `nick` appears on 42 lines across 8 cached transcripts. Every sample reads as the person, but it is ordinary English so the classifier refuses it by default. Vet with `./venv/bin/python scripts/preview_corrections.py --all --grep nick`, then either add it to `force:` in `config/terms.yml` or leave it documented as deliberately excluded.
 
-### Decide whether corrections appear on the Notion page
-In addition to `logs/`. Marginal — reconciliations are reviewed by a human anyway, so the page block would only save a manual correction rather than prevent a bad decision entry.
-
 ### Clean up dead code in `analyzer.py`
 Pylance flags two unused items (harmless, pre-existing):
 - Line 4: `import os` is unused — remove it.
@@ -65,6 +62,9 @@ Pylance flags two unused items (harmless, pre-existing):
 <!-- Future tasks -->
 
 ## Completed
+
+### Decide whether corrections appear on the Notion page — _2026-08-20 11:37 MST_
+✅ **Ruled in and built** ([DEC-010]). Cenay: *"place the corrections in a similar toggle as the transcript (can live right below it) that states the correction."* `notion_output.build_correction_blocks()` renders a collapsed `🔤 Term corrections applied by the pipeline` toggle immediately below the transcript toggle, carrying both the transcript pass and the analysis residual. ⚠️ **An empty run still renders the toggle** saying "none applied" — `None` (the corrector never ran) renders nothing, so silence cannot mean both "nothing there" and "nobody looked". Verified by `./venv/bin/python tests/test_notion_corrections.py` → 16 assertions, 0 failures; suppressing the toggle turns 3 red and collapsing the analysis grouping turns 2 red, so the suite is proven able to fail. ⚠️ Not yet seen rendered on a real Notion page.
 
 ### Confirm the prompt constraint holds against a live model — _2026-08-13 23:13 MST_
 ✅ **It held.** The unverified half of [DEC-009] is now measured against real runs, not reasoning. Two live meetings went through the full pipeline on 2026-08-13 (`trfa-tamp-new-class-bookeo` at 10:08, `trfaapi-deletes-new-bookeo-classes` at 23:00), applying 24 transcript-stage corrections between them — and **`logs/term-corrections.log` contains zero `[ANALYSIS — …]` entries**, i.e. the post-pass found nothing to repair either time. Since the transcript pass runs first, the analysis input was already clean, so a residual could only have come from the model *inventing* a wrong term. It invented none. Verified by `grep -c "ANALYSIS" logs/term-corrections.log` → `0`.
@@ -97,4 +97,5 @@ Transcript now lives in a Heading 3 toggle (`is_toggleable = true`), hidden by d
 [DEC-006]: DECISIONS.md#dec-006-every-correction-is-logged-to-logs
 [DEC-008]: DECISIONS.md#dec-008-add-term-will-auto-commit-its-one-file--an-exception-to-the-no-auto-commit-rule
 [DEC-009]: DECISIONS.md#dec-009-the-analysis-stage-is-protected-twice--a-prompt-constraint-and-a-post-pass-and-the-gap-between-them-is-the-measurement
+[DEC-010]: DECISIONS.md#dec-010-the-corrections-also-go-on-the-notion-page-in-a-toggle-directly-under-the-transcript
 <!-- link-doc-refs:end -->

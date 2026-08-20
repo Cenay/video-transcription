@@ -1,6 +1,13 @@
 # CLAUDE.md
 
-_Last updated 2026-08-12 19:54 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added the team roster, the six locations and the four-step reconciliation chain, so a session can judge a name correction without re-asking._
+_Last updated 2026-08-20 11:37 MST by an AI session · transcript: `f0912a53-461b-4861-97e4-931cb2f83ba0` — documented the corrections toggle in notion_output.py _
+
+<details>
+<summary>📜 <strong>Stamp history</strong> — the 1 previous update (older ones: <code>history/CLAUDE-stamp-history.md</code>)</summary>
+
+- _Prior: 2026-08-12 19:54 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added the team roster, the six locations and the four-step reconciliation chain, so a session can judge a name correction without re-asking._
+
+</details>
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -112,7 +119,8 @@ scripts/
 - `repair_meeting_page()` rebuilds an existing page's body in place (deletes current blocks, re-appends) while preserving its S3 Meeting Link — used to recover a page after an analysis failure
 - `update_meeting_link()` updates the page with S3 URL after upload
 - Splits transcript by speaker turns (blank lines) not arbitrary character counts
-- Transcript lives inside a collapsible Heading 3 toggle (`is_toggleable`), hidden by default: the toggle heading is created first, then transcript paragraphs are appended as its `children` in 100-block batches
+- Transcript lives inside a collapsible Heading 3 toggle (`is_toggleable`), hidden by default: the toggle heading is created first, then transcript paragraphs are appended as its `children` in 100-block batches (`_append_toggle()` does this for any toggle)
+- **Term corrections get their own toggle directly below the transcript** ([DEC-010]) — `build_correction_blocks()` lists every substitution from both passes (transcript, and the analysis residual grouped separately). ⚠️ `corrections=[]` renders the toggle saying "none applied"; `corrections=None` renders no toggle at all — silence must not mean both "nothing there" and "nobody looked". `pipeline.py` always passes a list
 - 2000-char block limit, 100 blocks per API request
 
 **Transcript caching (transcriber.py):**
