@@ -1,16 +1,40 @@
 # Lessons Learned
 
-_Last updated 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — added the stale-NOT-BUILT-warning lesson and the pinned-count test lesson_
+_Last updated 2026-08-20 12:12 MST by an AI session · transcript: `f0912a53-461b-4861-97e4-931cb2f83ba0` — a hand-carved exception inside the corpus guard had switched the check off for two words; the allowance is now computed_
 
 <details>
-<summary>📜 <strong>Stamp history</strong> — the 2 previous updates (older ones: <code>history/LESSONS_LEARNED-stamp-history.md</code>)</summary>
+<summary>📜 <strong>Stamp history</strong> — the 3 previous updates (older ones: <code>history/LESSONS_LEARNED-stamp-history.md</code>)</summary>
 
+- _Prior: 2026-08-14 00:28 MST by an AI session · transcript: `4c61a822-47ec-4195-b344-607007d9c624` — added the stale-NOT-BUILT-warning lesson and the pinned-count test lesson_
 - _Prior: 2026-08-13 12:22 MST by an AI session · transcript: `2fa5b28a-7c93-4f78-8239-fc20e8d6cc8f` — added the 2026-08-13 entry: shared prompt constants have multiple callers, stub the expensive call not the path, verification runs corrupt an audit log_
 - _Prior: 2026-08-12 19:41 MST by an AI session · transcript: `ce166dfb-eca1-4c5a-b935-71755aed3e98` — added three lessons: four defects all found by running not reading, the engine's total failure on non-English names, and the one-meeting generalisation that produced a wrong plan finding._
 
 </details>
 
 Running log of non-obvious failures and how we diagnosed/fixed them. Append new entries at the top.
+
+---
+
+## 2026-08-20 — A guard's exception was hand-carved, so it silently switched the guard off
+
+### Gotcha: `if word in (...): continue` inside a checker deletes coverage, it does not narrow it
+
+The corpus sweep in `tests/test_terms.py` asserts that no ordinary-English word is altered across every cached transcript — the check that makes the whole corrector trustworthy ([DEC-005]). It carried one hand-written exception: *"`active campaign` is intentionally consumed by the forced rule"*, implemented as `if word in ("active", "campaign"): continue`.
+
+**That `continue` does not narrow the check for those two words — it removes them from the sweep entirely.** Any corruption of `active` or `campaign`, from any term, by any mechanism, was invisible. ✅ Proven by mutation: forcing a bare `active` → `ActiveCampaign` (which destroys the word in 14 places in one transcript alone) passed the old sweep silently.
+
+**How it surfaced:** a *different* variant, `bookie o` → `Bookeo`, added by `/add-term` on 2026-08-18, started eating one `bookie` in two transcripts and turned the sweep red. The tempting fix was the same shape as the existing one — add `bookie` to the skip list — which would have blinded the guard to a third word.
+
+**The substitution was correct and the test was wrong.** ✅ Verified by reading every `bookie` in both transcripts: *"the sync is one way from bookie O to zero"*, *"if we can get data from Bookie Ota"*, *"we will no longer have to put up with Bookie O in the future"*. All the company, never a bookmaker.
+
+**Fix — compute the allowance instead of carving an exception.** `expected_drop(word, changes)` derives how many occurrences a **strictly longer** variant was entitled to swallow, straight from the substitutions `apply_corrections()` reports, and the sweep demands the drop equal that number exactly. The hand-written skip is gone, so `active` and `campaign` are genuinely checked for the first time.
+
+**Two properties worth keeping:**
+
+- **It is derived from the real function's own output**, not a re-implementation of its matching, so it cannot drift when `apply_corrections()` changes.
+- **A variant no longer than the dangerous phrase is never "expected."** A bare forced `bookie` or `booking` still fails — ✅ mutation-tested, `allowed 0` against 33 and 255 real occurrences. That also means forcing a bare ordinary word (the open `Nik` vs `nick` question) will turn this red on purpose: it is a decision that should have to edit the `DANGEROUS` list by hand rather than slip through.
+
+**Practice:** when a guard fires on a case you believe is legitimate, ⛔ do not exempt the *input*. Work out what the correct amount of change is and assert that instead. An exemption is indistinguishable from the guard being deleted, and it reads in the diff as diligence.
 
 ---
 

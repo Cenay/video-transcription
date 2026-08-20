@@ -289,6 +289,40 @@ DANGEROUS = ["booking", "bookings", "booked", "bookie", "book it", "book he",
              "real", "active", "campaign"]
 
 
+def _sublist_count(haystack: list[str], needle: list[str]) -> int:
+    """How many times `needle` appears as a contiguous run inside `haystack`."""
+    return sum(
+        haystack[i:i + len(needle)] == needle
+        for i in range(len(haystack) - len(needle) + 1)
+    )
+
+
+def expected_drop(word: str, changes: list) -> int:
+    """How many `word` occurrences a LONGER variant was entitled to swallow.
+
+    A multi-word variant that happens to contain an ordinary word must consume
+    it — that is the variant working, not English being corrupted. Measured
+    2026-08-20: `bookie o` -> Bookeo eats one `bookie` in two transcripts, and
+    every `bookie` in both is the company ("one way from bookie O to zero",
+    "put up with Bookie O in the future"), never a bookmaker.
+
+    ⛔ The variant must be STRICTLY LONGER than the dangerous phrase. A bare
+    forced `bookie` -> Bookeo is exactly the corruption this sweep exists to
+    catch, so it is never "expected" and still fails. That also means forcing a
+    bare ordinary word later (the open `Nik` vs `nick` question) turns this red
+    on purpose: it is a decision that should have to edit this list by hand.
+
+    Derived from `apply_corrections()`'s own returned substitutions rather than
+    re-implementing its matching, so it cannot drift away from the real thing.
+    """
+    want = word.lower().split()
+    return sum(
+        _sublist_count(c.variant.lower().split(), want) * c.count
+        for c in changes
+        if len(c.variant.split()) > len(want)
+    )
+
+
 def test_corpus():
     print("\n[9] corpus sweep — every cached transcript")
     terms = load_terms()
@@ -311,11 +345,14 @@ def test_corpus():
             pat = rf"\b{re.escape(word)}\b"
             before = len(re.findall(pat, text, re.I))
             after = len(re.findall(pat, out, re.I))
-            # "active campaign" is intentionally consumed by the forced rule.
-            if word in ("active", "campaign"):
-                continue
-            if before != after:
-                corrupted.append((Path(f).name, word, before, after))
+            # A longer variant containing this word is allowed to eat it —
+            # "bookie o" -> Bookeo, "active campaign" -> ActiveCampaign — and
+            # exactly that many, no more. Anything else is corruption.
+            allowed = expected_drop(word, changes)
+            if before - after != allowed:
+                corrupted.append(
+                    (Path(f).name, word, before, after, f"allowed {allowed}")
+                )
 
     print(f"         {seen} transcripts, {total} corrections applied")
     check("no ordinary-English word was altered anywhere in the corpus",
