@@ -1,10 +1,10 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-08-19 21:35 MST
+# Last synced: 2026-08-20 10:34 MST
 e1fad792a169d0789d2b166a7d14cbab22a6adfbece64adb4b17f9b330951a68  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 c0e61ad160d419f0190134863f84a1cbbe655886d2ab828f1d4f508986a2a0ad  .claude/skills/wrap-up/SKILL.md
 ab6dafc437cf44a3879f84fb94eaa4b6ffc3fc758cd82bcec668942e92be5f09  .claude/skills/next-step/SKILL.md
-41b7cae080aef3e8bfb77d89a554428defcba362426a1d81acdb1845c385e071  .claude/commands/init-project.md
+5ed5b48f58afd2031afddd940112ce8f7bd2de9ba2f97e6f61f547f9d2acacd8  .claude/commands/init-project.md
 589f23440799422d319e164a6d16ff89a5d6f6708f6d472d0397c4a3e26be553  .claude/commands/resume.md
 9a50013b99d1b34cea0522c0c9250c8891213f736f3e113723f4d9850efba4e8  .claude/commands/ship.md
 91a368a5d15f8132e444023ce82650696ef9eb0545f943e2ff1dd7f12dfc375b  .claude/commands/bug.md
@@ -15,6 +15,7 @@ f56063257dc3cd333706748da25d9a1f11e303a0ce55d4632771eb900c16b3a3  .claude/guides
 ddc89ae045c104214aed38f677ae7ecb7e0fe6dd8e74b6fd68ea876e064cd734  .claude/scripts/link-doc-refs.py
 19749afeb6e9f5bfe25598234fbb3bd71f9aacc8a71e1c6a5626e6a66d528945  .claude/scripts/reflow-md.py
 6f930c6d8e189c1ae2481c953ac4ec6ce01593ecdaf1617b6ce3593799e6e2b9  .claude/scripts/stamp-doc.py
-0d398800ecdfaeeef52366251655e698aa88bf70829317169d8211b1c5f12dd0  .claude/scripts/ledger_contract.py
+12c43b1c03c1d52130f99a07a3797e249831cfc61f7c291db741682418ec5678  .claude/scripts/ledger_contract.py
+80134380e60c02a26276de9b568769ee3fc784211e48b9d5bbea7e2db1342bf4  .claude/scripts/write-entry.py
 b485dfa0921abcc032fc04aec1e82bde4e8637ed86def76c104eea66bfb87d7e  .github/ISSUE_TEMPLATE/bug_report.yml
 4b5a0f7a5fbd0182f52030e9589a385533c906d0948c268be76efa433807923b  .github/ISSUE_TEMPLATE/config.yml

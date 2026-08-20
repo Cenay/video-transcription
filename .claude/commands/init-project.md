@@ -276,29 +276,27 @@ This file provides guidance to Claude Code when working in this repository.
 
 ## Resolved
 
-<!-- Format — keep this shape. It is what the index generator parses:
-     an `### DEC-NNN <title>` heading, then a `- **Status:**` bullet.
+<!-- The entry shape is NOT written out here, on purpose. Run:
 
-### DEC-001 <short title>
-- **Status:** ✅ RESOLVED (YYYY-MM-DD HH:MM TZ)
-- **Question:** What was actually being asked?
-- **Answer:** What was decided, and by whom.
-- **Why:** The reasoning. This is the part that matters later.
-- **Build impact:** What this changes about how we build.
+       python3 <toolkit>/scripts/write-entry.py --template
 
-Status vocabulary — use these exact words so entries stay machine-readable:
-  🚧 OPEN · 📋 PROPOSED · ⏸ DEFERRED · ✅ RESOLVED (or CLOSED) · ⛔ SUPERSEDED by [DEC-NNN]
+     and paste its output in place of this comment. That prints the canonical
+     skeleton and the status vocabulary, generated from the one definition in
+     `scripts/ledger_contract.py` — the same spec that `write-entry.py` emits
+     from and that check 9 of `ledger-lint.py` enforces.
 
-When an entry is superseded, ALSO add `- **Decided:** YYYY-MM-DD` to it. Its
-Status line then carries the date it was overturned, and that bullet preserves
-the date it was actually decided.
+     ⛔ DO NOT paste a field list into this file and maintain it here. That is
+     exactly what the previous version did: it prescribed the right shape, went
+     invisible once scaffolded, was imported by nothing, and drifted out of true
+     while still reading as correct. `scripts/test-template-not-copied.py`
+     fails if a field list reappears in this file.
 
-NO INDEX YET, DELIBERATELY. A long ledger earns an "Index" table at the top; a
-new one does not — an index over three entries costs more to maintain than it
-saves, and a stale one actively misleads. Add it when scanning the file starts
-costing more than a table would. The ledger's single writer generates it with
-the toolkit's `scripts/gen-dec-index.py` (which reads the shape above) — never
-by hand, because hand-patched rows drift out of true.
+     NO INDEX YET, DELIBERATELY. A long ledger earns an "Index" table at the
+     top; a new one does not — an index over three entries costs more to
+     maintain than it saves, and a stale one actively misleads. Add it when
+     scanning the file starts costing more than a table would. The ledger's
+     single writer generates it with the toolkit's `scripts/gen-dec-index.py`,
+     never by hand, because hand-patched rows drift out of true.
 -->
 ```
 

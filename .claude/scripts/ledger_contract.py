@@ -78,6 +78,118 @@ DECIDED_RE = field_re("Decided")
 
 Entry = namedtuple("Entry", "id level title line status decided slug")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# THE ENTRY SPEC — the strict half  (ruled 2026-08-20 by Cenay)
+#
+# ⛔ PARSE LIBERALLY, WRITE STRICTLY. Everything ABOVE this line reads a ledger
+# and is deliberately permissive — the docstring records why: a strict reader
+# once found 0 of 169 entries, and zero entries is indistinguishable from an
+# empty file. Everything BELOW defines the ONE shape new entries are written in.
+# The two must never be "harmonized". Loosening the writer is a style change;
+# tightening the reader breaks every ledger reader on the machine.
+#
+# WHY THIS IS DATA AND NOT PROSE. A template already existed — an HTML comment
+# inside the ledger that `commands/init-project.md` scaffolds, prescribing very
+# nearly this shape. It did not hold, for three reasons worth keeping in view:
+# it reached a project only at creation; it was invisible in the rendered
+# document; and nothing imported it, so nothing could check it. As data it is
+# imported by the writer, the checker and the template generator alike, so the
+# shape cannot be stated twice and cannot drift.
+#
+# Cenay, 2026-08-20: "I need it not to rot, and although it's more strict it
+# means my docs are consistent. Something I very much need."
+
+ENTRY_LEVEL = 3                  # `### DEC-045 Title` — see below for why not 2
+
+# Ordered. `Added` is first by ruling. Each is (label, required).
+#
+# ★ `Added` and `Decided` are NOT redundant. `Decided` is when the decision was
+# made; `Added` is when the entry was written. They diverge constantly and the
+# gap is exactly what a reader needs — this repo's ledger holds 16 entries
+# decided across three weeks and all added in one evening.
+ENTRY_FIELDS = (
+    ("Added", True),
+    ("Status", True),
+    ("Decided", True),
+    ("Question", True),
+    ("Answer", True),
+    ("Why", True),
+    ("Build impact", True),
+    ("Sources", False),
+)
+REQUIRED_FIELDS = tuple(name for name, req in ENTRY_FIELDS if req)
+
+# Written when the authoring date cannot be recovered. A literal, matched
+# exactly — which is why the spelling is fixed here rather than per-caller.
+ADDED_BACKFILL = "(Backfilled from scripts)"
+
+# The house stamp format, unchanged: date AND 24-hour time AND zone, taken from
+# `date`, never guessed. Two developers in different zones ship into one file.
+ADDED_FORMAT = "YYYY-MM-DD HH:MM TZ"
+
+# ⚠️ RESOLVED only. `CLOSED` was retired 2026-08-20 — two words for one state
+# across 325 status lines, and the index generator's status parser has already
+# produced one wrong classification from a vocabulary it had to guess at.
+STATUS_VOCAB = ("🚧 OPEN", "📋 PROPOSED", "⏸ DEFERRED", "✅ RESOLVED",
+                "⛔ SUPERSEDED", "🔗 REGISTRY")
+
+# Just the words, for checking a Status line that also carries a glyph and a
+# qualifier. Derived, never typed out again — a second list would drift.
+STATUS_WORDS = frozenset(s.split()[-1] for s in STATUS_VOCAB)
+
+# `2026-08-20 09:35 MST`. The house stamp: date AND 24-hour time AND zone, taken
+# from `date` and never guessed, because two developers in different zones ship
+# into the same files on the same day and a bare date cannot order them.
+ADDED_STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[A-Z]{2,5}$")
+
+# Field labels seen in the wild that mean one of ours. Meeting-derived entries
+# grew a whole second vocabulary; these are the same fields under other names.
+FIELD_SYNONYMS = {
+    "Decision": "Answer",
+    "Ruling": "Answer",
+    "Rationale": "Why",
+    "Closed": "Status",
+}
+
+# A registry stub is a receipt, not a decision — the number was consumed by an
+# entry in another repo. It takes its own minimal shape and is exempt from the
+# required set and from the restatement.
+REGISTRY_FIELDS = (("Status", True), ("Decided", True), ("Owner", True))
+
+
+def entry_template(entry_id="DEC-NNN", title="<short title — no date, no ID repeated>"):
+    """The canonical skeleton, generated from the spec above.
+
+    Every human-readable copy of the shape comes from here — the file under
+    `templates/`, and the comment `commands/init-project.md` scaffolds into a
+    new ledger. Neither is hand-written, so neither can drift from what the
+    checker enforces.
+    """
+    hint = {
+        "Added": ADDED_FORMAT,
+        "Status": "<glyph + WORD> (" + ADDED_FORMAT + ") — <optional qualifier>",
+        "Decided": "YYYY-MM-DD",
+        "Question": "<what was actually being asked>",
+        "Answer": "<what was decided, and by whom>",
+        "Why": "<the reasoning — the part that matters later>",
+        "Build impact": "<what this changes about how we build>",
+        "Sources": "<the meeting, pull request or chat session it came from>",
+    }
+    lines = [f"{'#' * ENTRY_LEVEL} {entry_id} {title}"]
+    lines += [f"- **{name}:** {hint.get(name, '')}".rstrip() for name, _ in ENTRY_FIELDS]
+    lines += [
+        "",
+        "<free-form body — extra bold-labeled paragraphs and sub-headings both allowed>",
+        "",
+        "> **TL;DR —** <plain English, no identifiers, no links, last element of the entry>",
+    ]
+    return "\n".join(lines)
+
+
+def status_vocab_line():
+    """The status words, for the same generated copies."""
+    return " · ".join(f"`{s}`" for s in STATUS_VOCAB)
+
 
 def slugify(text):
     """Slugify exactly as link-doc-refs.py:74 does, so anchors agree.
@@ -137,6 +249,175 @@ def parse_entries(text):
             decided=decided,
             slug=slugify(f"{m.group('id')} {title}"),
         ))
+    return out
+
+
+HEADING_RE = re.compile(r"^(#{1,6})\s")
+# A horizontal rule. Some ledgers put one between entries, so it is trailing
+# furniture belonging to no field — anything appended after it reads as the NEXT
+# entry's opening line. ✅ Measured 2026-08-20: 31 of them in fran-dash's ledger.
+HR_RE = re.compile(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$")
+# `<!-- link-doc-refs:start … -->`, `<!-- dec-index:start … -->`. A managed block
+# is machine-written and belongs to no entry — but the last entry on the page is
+# directly followed by one, so a reader that ignores this hands that entry the
+# whole rest of the file.
+MANAGED_RE = re.compile(r"^\s*<!--\s*[\w-]+:(?:start|end)\b")
+
+
+def fenced_lines(lines):
+    """Line indices inside (or opening/closing) a code fence.
+
+    An entry that QUOTES a form in an example must not be read as carrying one.
+    That is how a checker starts passing a file that never adopted a rule.
+    """
+    out, in_f = set(), False
+    for i, line in enumerate(lines):
+        if FENCE_RE.match(line):
+            in_f = not in_f
+            out.add(i)
+            continue
+        if in_f:
+            out.add(i)
+    return out
+
+
+def entry_bodies(lines, entries):
+    """(entry, first_body_index, body_lines) for each entry, in page order.
+
+    The body ends at the next heading **of the entry's own level or shallower**,
+    or at the start of a managed block. Not at the next DEC- heading: a ledger
+    ending with a `## Notes` section, or with the generated link block, would
+    give its final entry the remainder of the file.
+
+    ⚠️ And NOT at any heading whatsoever, which is what this did until
+    2026-08-20. A long entry may carry its own sub-sections — fran-dash's
+    `## DEC-219` has a `### The reservation rule` inside it — and ending the body
+    at that sub-heading truncates the entry at its first subsection. Measured
+    there, and it was silent in the worst way: the placer and the checker shared
+    the wrong boundary, so a restatement landed mid-entry and the checker then
+    agreed it was last.
+    """
+    fences = fenced_lines(lines)
+    out = []
+    for e in entries:
+        start = e.line          # e.line is 1-based, so this is the line AFTER it
+        end = start
+        while end < len(lines):
+            if end not in fences:
+                hm = HEADING_RE.match(lines[end])
+                if (hm and len(hm.group(1)) <= e.level) or MANAGED_RE.match(lines[end]):
+                    break
+            end += 1
+        out.append((e, start, lines[start:end]))
+    return out
+
+
+def body_tail(body):
+    """Index one past the last line of real content in an entry body.
+
+    Trailing blank lines and a trailing horizontal rule are furniture: they
+    separate this entry from the next one, so content belongs BEFORE them. This
+    is the one right answer to "where does something appended to this entry go",
+    and both the placer and the checker read it from here rather than each
+    deciding for itself.
+    """
+    n = len(body)
+    while n > 0 and (not body[n - 1].strip() or HR_RE.match(body[n - 1])):
+        n -= 1
+    return n
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Restatement grammar — the `> **TL;DR —**` line  (2026-08-19)
+#
+# WHY IT LIVES HERE. Two different documents now carry the same rule: a Session
+# Desk question (desk rule 14) and a ledger entry (check 8 of ledger-lint). The
+# grammar is identical in both; only the PLACEMENT differs — a desk item folds
+# its body, so the restatement sits above the folds, while a ledger entry has no
+# folds and takes it last. Placement is the consumer's business; what counts as
+# a restatement is not.
+#
+# So the regexes and the verdicts live once, here, and both checkers import
+# them. The alternative was a second hand-written copy, which is precisely the
+# failure this module was created to end: three scripts, three copies of one
+# grammar, three different wrong answers about the same ledger in one evening.
+#
+# ⚠️ Deliberately NO emoji in the required form. `🗣️` is U+1F5E3 U+FE0F, and a
+# copy that drops the variation selector is byte-different but visually
+# identical — a check keyed on it would fail for a reason nobody could see.
+#
+# The leading `>` is the blockquote wrapper (Cenay, 2026-08-19: "Can the TL;DR
+# section be in a backquote structure so it stands out?"). Optional in the
+# PATTERN and required by the templates: a document written before the
+# blockquote form, or by another session, must not hard-fail over presentation.
+# Its absence is a WARNING — see TLDR_QUOTED_RE and each consumer's check.
+TLDR_RE = re.compile(r"^(?:>\s*)*\*\*[^*]*\bTL;DR\b[^*]*\*\*\s*(.*)$")
+
+# Whether that TL;DR line was actually wrapped in a blockquote.
+TLDR_QUOTED_RE = re.compile(r"^>\s")
+
+# Bare identifiers, which are the whole reason this rule exists. Every one of
+# these is a LOOKUP: the reader has to leave the record to find out what the
+# token means before they can understand it. Cenay, 2026-08-19: "I spent half my
+# time looking up the things you reference so I can understand the damn
+# question." A gloss on first appearance does not help — by the ninth item that
+# gloss is 400 lines up, which is the same trip. In a ledger it is worse: many
+# entries cite ANOTHER repo's decisions, so there is no local heading to jump to
+# at all.
+#
+# Scanned on the RAW text, never on code-stripped output: these are almost
+# always written inside backticks, so stripping inline code first would make the
+# check silently never fire, which reads as green.
+TLDR_JARGON_RE = re.compile(r"\b(?:DEC|SUSP|BUG|G|M|D|T|Q)-?\d+\b")
+
+# A link is a lookup with extra steps, and an anchor into the same page is the
+# worst kind — it moves the reader away from the thing they were reading.
+TLDR_LINK_RE = re.compile(r"\]\(|https?://")
+
+# A proxy for "plain", not a measure of it — and a loose one on purpose.
+#
+# Set to 90 by Cenay 2026-08-19: "I am okay with the MAX WORDS being more than
+# 60 if needed. 80-100 should cover it." The first draft used 60, which is
+# roughly two sentences; a restatement that must also say what the choice is
+# BETWEEN, in plain terms, routinely needs more than that. Squeezing it is how a
+# plain restatement turns back into shorthand — the exact failure the rule
+# exists to prevent, arriving through the guard meant to enforce it.
+#
+# WARN only, never an error. A long TL;DR that reads clearly is fine; the flag
+# only says "check whether this drifted back into being the background".
+TLDR_MAX_WORDS = 90
+
+
+def tldr_findings(text):
+    """Judge a restatement's text — the part after `**TL;DR —**`.
+
+    `text` is the raw remainder captured by TLDR_RE.group(1), already stripped.
+    Returns a list of (kind, severity, detail) with kind in:
+
+        "empty"   error   detail None   — the line says TL;DR and nothing else
+        "jargon"  error   detail [ids]  — bare identifiers the reader must look up
+        "link"    error   detail None   — a link is a lookup with extra steps
+        "long"    warn    detail words  — over TLDR_MAX_WORDS
+
+    The CALLER formats the message, because a desk names a question (`Q7:`) and a
+    ledger names an entry (`DEC-031:`). What is wrong is shared; how it is said
+    is not.
+
+    NOT JUDGED, and it is the important half: whether the restatement is
+    accurate, or actually plainer than what it restates. A jargon-free sentence
+    can still be incomprehensible, and nothing mechanical can tell.
+    """
+    if not text:
+        return [("empty", "error", None)]
+    out = []
+    jargon = sorted({m.group(0) for m in TLDR_JARGON_RE.finditer(text)})
+    if jargon:
+        out.append(("jargon", "error", jargon))
+    if TLDR_LINK_RE.search(text):
+        out.append(("link", "error", None))
+    words = len(text.split())
+    if words > TLDR_MAX_WORDS:
+        out.append(("long", "warn", words))
     return out
 
 
