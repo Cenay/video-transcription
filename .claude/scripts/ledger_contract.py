@@ -127,6 +127,28 @@ ADDED_BACKFILL = "(Backfilled from scripts)"
 # `date`, never guessed. Two developers in different zones ship into one file.
 ADDED_FORMAT = "YYYY-MM-DD HH:MM TZ"
 
+# Two literal markers for a required `Build impact` that cannot simply be filled
+# in. Ruled 2026-08-20 by Cenay, after normalization stopped short on eight
+# entries — which turned out to be three different problems, not one.
+#
+# ⛔ NEITHER IS A PLACEHOLDER TO TIDY AWAY LATER. Each states a fact:
+#
+#   IMPACT_NONE   the entry was written without a build impact and one cannot be
+#                 added now. Writing what a decision from July "changed about how
+#                 we build" today means putting new claims into a historical
+#                 record, which the never-rewrite-archives rule forbids outright.
+#
+#   IMPACT_BELOW  the entry HAS its build impact, further down, after its
+#                 narrative. Cenay ruled a marker plus a note over a forced move:
+#                 in these entries the impact reads as a closing summary landing
+#                 after the execution notes and the verification passes, and
+#                 lifting it would put the conclusion before the evidence.
+#
+# Literals, matched exactly, defined once — the same reasoning as the back-fill
+# marker for a date that cannot be recovered.
+IMPACT_NONE = "(None recorded)"
+IMPACT_BELOW = "(Recorded below, after the narrative)"
+
 # ⚠️ RESOLVED only. `CLOSED` was retired 2026-08-20 — two words for one state
 # across 325 status lines, and the index generator's status parser has already
 # produced one wrong classification from a vocabulary it had to guess at.
