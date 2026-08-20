@@ -73,3 +73,8 @@ temp/*
 
 # Local recovery archive (safe-delete staging) — never commit
 .archived/
+
+# Session Desks — scratch, disposable, never committed.
+# See skills/session-desk/SKILL.md.
+SESSION-DESK*.md
+docs/sessions/
