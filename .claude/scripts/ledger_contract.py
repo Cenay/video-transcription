@@ -223,8 +223,27 @@ def read_sibling(path):
     return nums
 
 
+# A ledger that shares its DEC- series with nobody says so, in one word, on a
+# line of its own. This is NOT the same state as an absent config file, and the
+# difference is the whole point: absent means "nobody has said", which is
+# unsafe to answer from; STANDALONE means "someone checked, and this series is
+# its own". Only the second permits allocating a number.
+#
+# Added 2026-08-19, because next-free refused on this toolkit forever. The
+# refusal was right -- it could not tell the two states apart -- but the repo
+# is provably standalone: it holds DEC-001..028 while fran-dash holds
+# DEC-001..220+, so the two cannot possibly be one series.
+STANDALONE = "standalone"
+
+
 def load_siblings(repo_root="."):
-    """-> list of configured sibling ledger paths (may be empty)."""
+    """-> list of configured sibling ledger paths, or the string STANDALONE.
+
+    Three distinct returns, and callers must treat them differently:
+      []          no config file -- nobody has declared anything. Unsafe.
+      STANDALONE  explicitly declared to share its series with no one. Safe.
+      [paths...]  the siblings to read.
+    """
     import os
     cfg = os.path.join(repo_root, SIBLING_CONFIG)
     if not os.path.exists(cfg):
@@ -234,6 +253,8 @@ def load_siblings(repo_root="."):
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
+        if line.lower() == STANDALONE:
+            return STANDALONE
         paths.append(line if os.path.isabs(line) else os.path.join(repo_root, line))
     return paths
 
@@ -349,11 +370,17 @@ def _cli_next_free(argv):
     # collision-checking. There, an unread sibling means "not checked"; here it
     # means the number printed may already be taken in the repo nobody read.
     # Measured 2026-08-12: DEC-221 was live in the API repo and absent here.
-    if not siblings:
+    standalone = siblings == STANDALONE
+    if standalone:
+        siblings = []
+    elif not siblings:
         print(f"REFUSING to name a free number: no sibling ledgers configured "
               f"({SIBLING_CONFIG} absent).")
         print("  The DEC- series spans repos ([DEC-205]), so a single-ledger "
               "answer is not an answer.")
+        print(f"  If this ledger genuinely shares its series with nobody, say so"
+              f" explicitly: put the single word `{STANDALONE}` in"
+              f" {SIBLING_CONFIG}.")
         return 1
 
     used = dec_numbers(open(args.ledger, encoding="utf-8").read(),
@@ -391,8 +418,16 @@ def _cli_next_free(argv):
     else:
         print(f"next free: DEC-{run[0]:03d}..DEC-{run[-1]:03d} "
               f"({len(run)} consecutive)")
-    print(f"  scanned: {args.ledger} + {len(read_ok)} sibling(s); "
-          f"highest in use DEC-{max(used):03d} (registry stubs counted)")
+    if standalone:
+        print(f"  scanned: {args.ledger} ALONE — this ledger is declared "
+              f"`{STANDALONE}` in {SIBLING_CONFIG}; "
+              f"highest in use DEC-{max(used):03d} (registry stubs counted)")
+        print("  NOT CHECKED: any other repo's ledger. That is correct only if "
+              "the declaration is true — re-check it before trusting this "
+              "number if the repo has since joined a shared series.")
+    else:
+        print(f"  scanned: {args.ledger} + {len(read_ok)} sibling(s); "
+              f"highest in use DEC-{max(used):03d} (registry stubs counted)")
 
     # Name what was NOT checked, so silence cannot read as "nothing there".
     reservations, scanned = reserved_in_unapplied_intake(args.repo_root)
@@ -436,6 +471,19 @@ def _cli(argv):
         return 0
 
     siblings = args.sibling or load_siblings(args.repo_root)
+    # STANDALONE is a STRING, and a string is iterable -- without this branch the
+    # loop below treats it as ten one-character sibling paths and reports ten
+    # skips. That is exactly what happened on 2026-08-19 when the sentinel was
+    # added to next-free and this second caller was missed: "all 10 configured
+    # sibling(s) were skipped". A sentinel that shares a type with the normal
+    # value has to be handled at EVERY consumer, not the one you were editing.
+    if siblings == STANDALONE:
+        print(f"skip: this ledger is declared `{STANDALONE}` in {SIBLING_CONFIG} "
+              f"— it shares its DEC- series with no one, so there is nothing to "
+              f"collide with")
+        print("      NOT CHECKED: any other repo's ledger, by design. Correct "
+              "only while that declaration is true.")
+        return 0
     if not siblings:
         print(f"skip: no sibling ledgers configured ({SIBLING_CONFIG} absent) — "
               f"cross-repo DEC- collisions NOT checked")
