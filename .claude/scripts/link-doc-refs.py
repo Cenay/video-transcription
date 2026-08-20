@@ -21,7 +21,7 @@ What it does:
     so each G maps to the slug of the section heading it lives under.
   - In every *narrative* doc, brackets resolvable bare IDs into shortcut references
     and (re)writes the managed link-definition block. IDs with no ledger heading are
-    left as plain text and reported as unresolved.
+    left EXACTLY AS WRITTEN and reported as unresolved — never rewritten.
   - DECISIONS.md is BOTH a target and self-linked (see below). The frozen historical
     records (intake/, discovery/, archive/) are targets only — never rewritten.
 
@@ -202,15 +202,32 @@ def rewrite_doc(abspath, docs_dir, id_map, dry, self_relpath=None):
     def resolvable(rid):
         return rid in id_map
 
-    # 2. Unwrap shortcut refs whose ID no longer resolves (self-healing), so we
-    #    never leave a dangling `[DEC-999]`. Namespaced range-tail labels too.
-    def unwrap_shortcut(m):
-        return m.group(1) if not resolvable(m.group(1)) else m.group(0)
-
-    text = re.sub(r"\[(DEC-\d+|M-\d+|D-\d+|G\d+)\](?![(\[:])", unwrap_shortcut, text)
-    text = re.sub(r"\[(\d+)\]\[dec-(\d+)\]",
-                  lambda m: m.group(0) if resolvable(f"DEC-{m.group(2)}") else m.group(1),
-                  text)
+    # 2. An ID this ledger cannot resolve is REPORTED, never rewritten.
+    #
+    # This step used to "self-heal" by stripping the brackets off any ID absent
+    # from the local ledger, on the theory that it was dangling. ⛔ That theory
+    # is wrong whenever a repo cites ANOTHER repo's decisions, and measured
+    # 2026-08-19 in this toolkit it was wrong every single time: it rewrote
+    # [DEC-150] and [DEC-157] in CURRENT_STATUS.md, [DEC-169] and [DEC-089] in
+    # TODOS.md, and one more in NEXT_STEPS.md -- five real fran-dash decisions
+    # turned into ordinary prose. Zero were typos.
+    #
+    # It is not cosmetic, which is how the old TODO described it: the brackets
+    # are the ONLY signal that a token is a ledger reference at all, so removing
+    # them makes a decision read as a bare string and silently breaks the search
+    # that would find it.
+    #
+    # ⚠️ Sibling-ledger lookup is deliberately NOT the fix. "Shares a DEC- number
+    # series with" (allocation) and "may cite decisions from" (reference) are
+    # different relations: this toolkit is `standalone` for numbering and still
+    # cites fran-dash constantly. Conflating them would re-break exactly this.
+    #
+    # Nothing is left dangling by leaving the text alone. Step 1 strips and
+    # regenerates the whole managed block, so an unresolvable ID simply gets no
+    # definition and Markdown renders `[DEC-999]` as literal text -- visible
+    # brackets, not a broken link. The unwrap was never needed for correctness.
+    # A genuine typo surfaces in the `unresolved` report at the end of the run,
+    # which is a person's call to make, not a silent rewrite of their prose.
 
     # 3. Bracket bare, resolvable IDs line by line (protecting code + existing links).
     src_lines = text.splitlines(keepends=True)
@@ -358,7 +375,7 @@ def iter_docs(docs_dir):
 
 
 def unresolved_in(docs_dir, ledger_paths, id_map):
-    """Report referenced IDs that have no ledger heading (left as plain text)."""
+    """Report referenced IDs that have no ledger heading (left untouched)."""
     missing = {}
     for doc in iter_docs(docs_dir):
         if doc in ledger_paths:
@@ -434,7 +451,8 @@ def main():
             print(f"  - {rel}: {n} reference(s)")
     if missing:
         items = ", ".join(f"{k}×{v}" for k, v in sorted(missing.items()))
-        print(f"unresolved (no ledger heading — left as plain text): {items}")
+        print(f"unresolved in THIS ledger — left untouched, NOT rewritten "
+              f"(they may live in another repo's ledger; check before calling one a typo): {items}")
 
 
 if __name__ == "__main__":
