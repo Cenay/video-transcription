@@ -133,12 +133,14 @@ terms:
       - knight through  # 6 manglings in the 2026-08-18 Art meeting alone
       - 9th grid  # 6 manglings in the 2026-08-18 Art meeting alone
     force:
+      # `9th route` and `9th grid` were listed here too and removed 2026-08-20:
+      # `9th` is not an ordinary English word, so the classifier already applies
+      # them and forcing was redundant. `force:` is for variants the classifier
+      # would otherwise REFUSE — a decorative entry fails tests/test_terms.py.
       - ninth root
       - ninth route
-      - 9th route
       - nine through
       - knight through
-      - 9th grid
 
   # ------------------------------------------------------------------- FDD --
   # Added 2026-08-18 via /add-term.
