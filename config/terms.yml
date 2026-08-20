@@ -166,6 +166,12 @@ terms:
     heard:
       - MPN
 
+  # ---------------------------------------------------------------- Reverb --
+  # Added 2026-08-20 via /add-term.
+  - correct: Reverb
+    heard:
+      - laravel verb
+
 # ---------------------------------------------------------------------------
 # DELIBERATELY NOT INCLUDED — each of these was measured and left out. Recorded
 # so nobody "helpfully" adds them later without knowing why.
