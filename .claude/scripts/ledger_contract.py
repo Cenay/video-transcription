@@ -260,6 +260,163 @@ def check_dec_collisions(local_ledger, sibling_paths):
     return collisions, skips
 
 
+def reserved_in_unapplied_intake(repo_root="."):
+    """-> (reservations, scanned_count) where reservations is [(n, path)].
+
+    An intake note that has been WRITTEN but not yet APPLIED claims DEC- numbers
+    that appear in no ledger. `next-free` cannot see them, so it would hand one
+    out twice. This is not hypothetical: the 2026-08-10 API session had to read
+    fran-dash's intake by hand to discover DEC-215/216/217 were spoken for, and
+    recorded DEC-218 as "the next genuinely free number" for exactly this reason.
+
+    Deliberately a WARNING, never a subtraction. Parsing prose for reservations
+    is fuzzy, and silently skipping numbers on a fuzzy match would produce gaps
+    nobody can explain later. Name them; let the human rule.
+    """
+    import os
+    import re
+    reservations, scanned = [], 0
+    intake = os.path.join(repo_root, "docs", "intake")
+    if not os.path.isdir(intake):
+        return reservations, scanned
+    for dirpath, _dirs, files in os.walk(intake):
+        for fn in files:
+            if not fn.endswith("-reconciliation.md"):
+                continue
+            path = os.path.join(dirpath, fn)
+            try:
+                text = open(path, encoding="utf-8").read()
+            except OSError:
+                continue
+            scanned += 1
+            # Only notes NOT yet applied hold live reservations -- an applied
+            # note's numbers are in the ledger, where dec_numbers() sees them.
+            #
+            # Read the STATE off the "Scope of this file:" line specifically,
+            # never off the whole document. First cut matched "PENDING" anywhere
+            # in the text and then harvested every DEC- number in the file; on
+            # the real corpus that reported 121 reservations out of 24 notes,
+            # because an applied note cites dozens of IDs in ordinary prose.
+            # It "passed" only because the true answer happened to sit above
+            # every number it wrongly collected.
+            scope = ""
+            for line in text.splitlines():
+                if "Scope of this file:" in line:
+                    scope = line.upper()
+                    break
+            if not scope or "APPLIED" in scope:
+                continue
+            if "PROPOSAL ONLY" not in scope and "PENDING" not in scope:
+                continue
+            # And take the number from the house-format declaration only, not
+            # from prose. Every note this skill writes carries the line
+            # "Suggested DEC IDs start at DEC-NNN".
+            for m in re.finditer(r"[Ss]uggested DEC IDs? start at\D{0,12}DEC-(\d{3,})",
+                                 text):
+                reservations.append((int(m.group(1)), path))
+    return reservations, scanned
+
+
+def _cli_next_free(argv):
+    """Report the next unused DEC- number across THIS ledger and every sibling.
+
+    Exists because the hand-maintained "Next free number is DEC-NNN" line in
+    NEXT_STEPS.md went stale four times in eleven days — and it is an ALLOCATOR,
+    so trusting it does not merely mislead, it manufactures a collision.
+    """
+    import argparse
+    import os
+    ap = argparse.ArgumentParser(
+        prog="ledger_contract.py next-free",
+        description="Print the next free DEC- number across this ledger and "
+                    "all sibling ledgers. Refuses to answer if any sibling "
+                    "cannot be read.")
+    ap.add_argument("ledger", help="this repo's DECISIONS.md")
+    ap.add_argument("--sibling", action="append", default=[],
+                    help=f"sibling ledger path (repeatable). Default: read {SIBLING_CONFIG}")
+    ap.add_argument("--repo-root", default=".")
+    ap.add_argument("--count", type=int, default=1,
+                    help="report a run of N consecutive free numbers")
+    args = ap.parse_args(argv)
+
+    if not os.path.exists(args.ledger):
+        print(f"REFUSING: no ledger at {args.ledger}")
+        return 2
+
+    siblings = args.sibling or load_siblings(args.repo_root)
+
+    # A skip is NEVER a pass -- and for allocation it is worse than for
+    # collision-checking. There, an unread sibling means "not checked"; here it
+    # means the number printed may already be taken in the repo nobody read.
+    # Measured 2026-08-12: DEC-221 was live in the API repo and absent here.
+    if not siblings:
+        print(f"REFUSING to name a free number: no sibling ledgers configured "
+              f"({SIBLING_CONFIG} absent).")
+        print("  The DEC- series spans repos ([DEC-205]), so a single-ledger "
+              "answer is not an answer.")
+        return 1
+
+    used = dec_numbers(open(args.ledger, encoding="utf-8").read(),
+                       include_registry=True)
+    # Registry stubs COUNT here, unlike in check-collisions. A stub is a receipt
+    # for a number consumed by another repo ([DEC-219]) -- the number is spent,
+    # so re-issuing it would create the very duplicate the stub records.
+    read_ok = []
+    for path in siblings:
+        try:
+            text = open(path, encoding="utf-8").read()
+        except OSError as exc:
+            print(f"REFUSING to name a free number: sibling unreadable: "
+                  f"{path} ({exc})")
+            return 1
+        nums = dec_numbers(text, include_registry=True)
+        if not nums:
+            print(f"REFUSING to name a free number: sibling parsed to ZERO "
+                  f"DEC- entries: {path}")
+            print("  That is what a broken parser prints, and it is "
+                  "indistinguishable from an empty ledger.")
+            return 1
+        used |= nums
+        read_ok.append(path)
+
+    if not used:
+        print("REFUSING: no DEC- entries found in any ledger")
+        return 1
+
+    n = max(used) + 1
+    run = list(range(n, n + max(1, args.count)))
+
+    if len(run) == 1:
+        print(f"next free: DEC-{run[0]:03d}")
+    else:
+        print(f"next free: DEC-{run[0]:03d}..DEC-{run[-1]:03d} "
+              f"({len(run)} consecutive)")
+    print(f"  scanned: {args.ledger} + {len(read_ok)} sibling(s); "
+          f"highest in use DEC-{max(used):03d} (registry stubs counted)")
+
+    # Name what was NOT checked, so silence cannot read as "nothing there".
+    reservations, scanned = reserved_in_unapplied_intake(args.repo_root)
+    clashes = sorted({r for r, _p in reservations if r >= run[0]})
+    if clashes:
+        print("")
+        print(f"  ⚠ UNAPPLIED INTAKE claims {len(clashes)} number(s) at or above "
+              f"this: " + ", ".join(f"DEC-{c:03d}" for c in clashes))
+        for c in clashes:
+            for r, p in reservations:
+                if r == c:
+                    print(f"      DEC-{c:03d} <- {os.path.relpath(p, args.repo_root)}")
+                    break
+        print("  These are in NO ledger yet, so the number above does not "
+              "account for them. Read those notes before allocating.")
+    elif scanned:
+        print(f"  ✅ checked {scanned} intake reconciliation note(s) for "
+              f"unapplied reservations — none at or above DEC-{run[0]:03d}")
+    else:
+        print("  ⚠ no intake reconciliation notes scanned (docs/intake absent) "
+              "— unapplied reservations NOT checked")
+    return 0
+
+
 def _cli(argv):
     import argparse
     import os
@@ -323,4 +480,8 @@ if __name__ == "__main__":
     _argv = sys.argv[1:]
     if _argv and _argv[0] == "check-collisions":
         raise SystemExit(_cli(_argv[1:]))
-    raise SystemExit("usage: ledger_contract.py check-collisions LEDGER [--sibling PATH]")
+    if _argv and _argv[0] == "next-free":
+        raise SystemExit(_cli_next_free(_argv[1:]))
+    raise SystemExit(
+        "usage: ledger_contract.py check-collisions LEDGER [--sibling PATH]\n"
+        "       ledger_contract.py next-free       LEDGER [--sibling PATH] [--count N]")
