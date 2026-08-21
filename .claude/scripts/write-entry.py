@@ -41,10 +41,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from ledger_contract import (  # noqa: E402
-    ADDED_BACKFILL, ENTRY_FIELDS, ENTRY_LEVEL, FIELD_SYNONYMS, ID_PATTERN,
-    ADDED_STAMP_RE, REGISTRY_FIELDS, REQUIRED_FIELDS, STATUS_WORDS, body_tail,
-    entry_bodies, entry_template, parse_entries, status_vocab_line,
-    tldr_findings,
+    ADDED_BACKFILL, ADDED_STAMP_RE, BACKFILL_SENTINELS, ENTRY_FIELDS,
+    ENTRY_LEVEL, FIELD_SYNONYMS, ID_PATTERN, REGISTRY_FIELDS, REQUIRED_FIELDS,
+    STATUS_WORDS, body_tail, entry_bodies, entry_template, parse_entries,
+    status_vocab_line, tldr_findings,
 )
 
 TLDR_PREFIX = "> **TL;DR —** "
@@ -118,6 +118,24 @@ def validate(spec_in):
     for name in required:
         if not (fields.get(name) or "").strip():
             p.append(f"required field {name!r} is missing or empty")
+
+    # ⛔ A BACK-FILL MAY STATE A GAP; AN AUTHOR MAY NOT. The sentinels exist so a
+    # historical entry whose reasoning was never written down can conform without
+    # anyone inventing one. Ruled 2026-08-20: "I don't want to drop any we CAN
+    # rebuild. Only those that we have nothing to recover from."
+    #
+    # ★ Refusing them HERE is the whole reason the field could stay required
+    # instead of being relaxed. Relaxing it would have applied to new entries
+    # too — the writer and the checker read the same REQUIRED_FIELDS — so the
+    # gap-statement had to be something only the back-fill can place. `Added` is
+    # exempt: its sentinel is checked just below, where a real stamp is also
+    # accepted, because an unrecoverable authoring date is an ordinary outcome
+    # for an entry written before the field existed.
+    for name, val in ((n, (fields.get(n) or "").strip()) for n in required):
+        if name != "Added" and val in BACKFILL_SENTINELS:
+            p.append(f"field {name!r} is the back-fill literal {val!r} — that states "
+                     f"a gap in a HISTORICAL entry and may only be written by the "
+                     f"back-fill. A new entry must carry a real value.")
 
     added = (fields.get("Added") or "").strip()
     if added and added != ADDED_BACKFILL and not ADDED_STAMP_RE.match(added):

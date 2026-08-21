@@ -149,6 +149,44 @@ ADDED_FORMAT = "YYYY-MM-DD HH:MM TZ"
 IMPACT_NONE = "(None recorded)"
 IMPACT_BELOW = "(Recorded below, after the narrative)"
 
+# The general form of the same idea, ruled 2026-08-20 by Cenay for the fields
+# that have no entry-specific marker of their own — `Why` above all.
+#
+# THE MEASUREMENT THAT FORCED IT. On fran-dash: `Why` is required and missing on
+# 254 of 259 entries. 192 of those have prose in the entry the reason can be
+# lifted out of; **62 have nothing anywhere in the entry.** Same shape on
+# `Question` (14) and `Build impact` (11) — 87 field values in total that no
+# amount of reading can recover, because the reasoning was never written down.
+#
+# ⛔ THE THREE OPTIONS AND WHY THIS ONE. Inventing a reason is the worst possible
+# output — a fabricated `Why` is indistinguishable from a real one and becomes
+# the permanent record of why a decision was made. Relaxing the field to optional
+# was Cenay's first instinct and was withdrawn on measurement: ✅ the writer and
+# the checker read the SAME `REQUIRED_FIELDS`, so relaxing it for history relaxes
+# it for every new entry too — verified by running the writer against an entry
+# with no `Why` before and after the change (refused, then silently accepted).
+#
+# ★ So the field stays REQUIRED and the gap gets STATED. The sentinel is a claim
+# — "we looked and there is nothing" — which is true, and is a different thing
+# from silence. It is also greppable, so the size of the hole stays countable;
+# relaxing the field would have made it invisible.
+#
+# ⛔ `write-entry.py` REFUSES any of these on a new entry. That is what keeps the
+# rule honest: a back-fill may state a gap, an author may not. Ruled 2026-08-20
+# — "I don't want to drop any we CAN rebuild. Only those that we have nothing to
+# recover from."
+#
+# ★ The wording is Cenay's own, 2026-08-20, and is kept verbatim: it says what
+# was done and when, not merely that something is absent. "On this backfill"
+# time-stamps the claim — a later reader knows the gap was assessed during the
+# back-fill rather than left unexamined, and that new evidence may still fill it.
+FIELD_UNRECOVERABLE = "(Nothing to recover from on this backfill)"
+
+# Every literal a BACK-FILL may write into a required field, and no author may.
+# One set, so the writer's refusal and any future checker read the same list
+# rather than each carrying its own idea of what a placeholder looks like.
+BACKFILL_SENTINELS = (ADDED_BACKFILL, IMPACT_NONE, IMPACT_BELOW, FIELD_UNRECOVERABLE)
+
 # ⚠️ RESOLVED only. `CLOSED` was retired 2026-08-20 — two words for one state
 # across 325 status lines, and the index generator's status parser has already
 # produced one wrong classification from a vocabulary it had to guess at.
@@ -398,16 +436,30 @@ TLDR_LINK_RE = re.compile(r"\]\(|https?://")
 
 # A proxy for "plain", not a measure of it — and a loose one on purpose.
 #
-# Set to 90 by Cenay 2026-08-19: "I am okay with the MAX WORDS being more than
-# 60 if needed. 80-100 should cover it." The first draft used 60, which is
-# roughly two sentences; a restatement that must also say what the choice is
-# BETWEEN, in plain terms, routinely needs more than that. Squeezing it is how a
-# plain restatement turns back into shorthand — the exact failure the rule
-# exists to prevent, arriving through the guard meant to enforce it.
+# Raised to 150 by Cenay 2026-08-20: "I would rather have too many words, than
+# not enough clarity on the TL;DR -- so if the cap is holding us back, lift it."
 #
-# WARN only, never an error. A long TL;DR that reads clearly is fine; the flag
-# only says "check whether this drifted back into being the background".
-TLDR_MAX_WORDS = 90
+# ⚠️ MEASURED FIRST, and the measurement says the number was never the
+# constraint: across the first 80 drafted restatements the longest ran 71 words,
+# ZERO landed in the 80-90 band, and none exceeded the cap. The limiter was the
+# drafter compressing by habit toward ~35-50 words, not the guard. Raising the
+# number is the standing instruction for what comes next; it does not by itself
+# make anything clearer, and nobody should read a bigger cap as the fix.
+#
+# ★ The direction of the trade is what this records: an over-long restatement
+# that reads clearly costs a few seconds. A compressed one silently drops the
+# amendment, the exception, or what the choice was BETWEEN — and reads perfectly
+# well while doing it, which is why no checker catches it.
+#
+# (Was 90, set 2026-08-19: "80-100 should cover it." Was 60 before that, which
+# is roughly two sentences and was squeezing plain restatements back into
+# shorthand — the exact failure the rule exists to prevent, arriving through the
+# guard meant to enforce it.)
+#
+# WARN only, never an error — at every value it has ever held. A long TL;DR that
+# reads clearly is fine; the flag only says "check whether this drifted back
+# into being the background".
+TLDR_MAX_WORDS = 150
 
 
 def tldr_findings(text):
