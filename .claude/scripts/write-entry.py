@@ -44,6 +44,7 @@ from ledger_contract import (  # noqa: E402
     ADDED_BACKFILL, ADDED_STAMP_RE, BACKFILL_SENTINELS, ENTRY_FIELDS,
     ENTRY_LEVEL, FIELD_SYNONYMS, ID_PATTERN, REGISTRY_FIELDS, REQUIRED_FIELDS,
     STATUS_WORDS, TASK_FIELDS, body_tail, entry_bodies, entry_template,
+    required_fields,
     parse_entries, status_vocab_line, tldr_findings,
 )
 
@@ -91,7 +92,12 @@ def entry_spec(fields, registry=False):
         return REGISTRY_FIELDS
     if (fields.get("Task") or "").strip():
         return TASK_FIELDS
-    return ENTRY_FIELDS
+    # ⚠️ `Decided` is required only once there IS a decision — ruled 2026-08-21.
+    # An OPEN entry may still carry one (a part-ruling), so it is dropped from
+    # the spec only when the entry does not have it. Dropping it unconditionally
+    # would refuse the nine open entries that legitimately carry one.
+    keep = set(required_fields((fields.get("Status") or ""), list(fields)))
+    return tuple((n, r and n in keep) for n, r in ENTRY_FIELDS)
 
 
 def emit_entry(entry_id, title, fields, body="", tldr="", registry=False,

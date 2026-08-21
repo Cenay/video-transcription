@@ -237,6 +237,57 @@ REGISTRY_FIELDS = (("Status", True), ("Decided", True), ("Owner", True))
 # it is by what it carries, so nothing external has to hold a list.
 TASK_FIELDS = (("Added", True), ("Status", True), ("Task", True))
 
+# `Decided` is required only once there IS a decision. Ruled 2026-08-21 by
+# Cenay: "I don't see how it can be forced to have a date if nothing is
+# decided."
+#
+# ⛔ THE CONTRACT WAS ASKING FOR A FACT THAT DOES NOT EXIST YET. `Decided` is
+# when the decision was made. An entry whose Status is OPEN or PROPOSED has not
+# been decided, so there is no date to record and the only ways to satisfy the
+# checker were to invent one or to reuse `Added` — which is the authoring date,
+# a different fact.
+#
+# ✅ Measured on fran-dash before the ruling: of the 32 decisions missing a
+# `Decided`, **21 are OPEN**. And the ledger already behaved this way — of all
+# 30 open decisions, 21 carry no `Decided` and only 9 do. The practice was
+# consistent; only the checker disagreed with it.
+#
+# ★ Same shape as TASK_FIELDS and REGISTRY_FIELDS directly above: the required
+# set depends on what the entry IS. The difference is that those two are chosen
+# by what the entry carries, and this one by a Status VALUE — which
+# `REGISTRY_FIELDS` already does, so the precedent and the machinery both exist.
+SETTLED_STATUS_WORDS = frozenset({"RESOLVED", "SUPERSEDED", "DEFERRED"})
+
+
+def is_settled(status):
+    """True when the Status names a state in which a decision HAS been made.
+
+    ⚠️ DEFERRED counts as settled: deciding to defer is a decision, and it
+    happened on a day. `DEC-005` is the case — deferred with the dashboard port
+    on 2026-07-12, a real and recoverable date.
+    """
+    head = (status or "").split("—", 1)[0].upper()
+    return bool(set(re.findall(r"[A-Z]{3,}", head)) & SETTLED_STATUS_WORDS)
+
+
+def required_fields(status=None, labels=()):
+    """The required prefix for ONE decision entry.
+
+    ⚠️ `Decided` is OPTIONAL on an unsettled entry, not forbidden — so it is
+    dropped from the requirement only when the entry does not carry one. An
+    open entry that DOES have a `Decided` (9 of them in fran-dash, typically
+    part-ruled) keeps it, in its canonical position.
+
+    ⛔ Getting that wrong is a regression, not a nicety: check 9 compares an
+    exact prefix, so simply removing `Decided` from the list would make those
+    nine fail with "expected 'Question' at position 3, found 'Decided'" — the
+    ruling would have broken the entries that were already right.
+    """
+    fields = [name for name, req in ENTRY_FIELDS if req]
+    if not is_settled(status) and "Decided" not in labels:
+        fields.remove("Decided")
+    return tuple(fields)
+
 
 def entry_template(entry_id="DEC-NNN", title="<short title — no date, no ID repeated>"):
     """The canonical skeleton, generated from the spec above.
