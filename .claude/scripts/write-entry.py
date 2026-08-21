@@ -43,8 +43,8 @@ sys.path.insert(0, str(HERE))
 from ledger_contract import (  # noqa: E402
     ADDED_BACKFILL, ADDED_STAMP_RE, BACKFILL_SENTINELS, ENTRY_FIELDS,
     ENTRY_LEVEL, FIELD_SYNONYMS, ID_PATTERN, REGISTRY_FIELDS, REQUIRED_FIELDS,
-    STATUS_WORDS, body_tail, entry_bodies, entry_template, parse_entries,
-    status_vocab_line, tldr_findings,
+    STATUS_WORDS, TASK_FIELDS, body_tail, entry_bodies, entry_template,
+    parse_entries, status_vocab_line, tldr_findings,
 )
 
 TLDR_PREFIX = "> **TL;DR —** "
@@ -55,17 +55,72 @@ DECIDED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 # own linter rejects.
 
 
-def emit_entry(entry_id, title, fields, body="", tldr="", registry=False):
+def entry_spec(fields, registry=False):
+    """The field spec for ONE entry — the three kinds, decided the same way
+    `ledger-lint.py` decides them.
+
+    ⛔ THIS EXISTS BECAUSE THERE ARE THREE ENTRY KINDS AND THIS FILE KNEW TWO.
+    ✅ Measured 2026-08-21: `emit_entry` read
+    `REGISTRY_FIELDS if registry else ENTRY_FIELDS`, so a build task was laid
+    out as a decision. `Task` is not in `ENTRY_FIELDS`, so it fell through to
+    the free body — which `emit_entry` starts with a BLANK LINE. A blank line
+    ends a field run (`ledger-lint.py:319-321`), so the `Task` line dropped out
+    of the run the checker reads, the entry stopped declaring itself a task,
+    and the full decision set was demanded of it.
+
+    ★ The damage was invisible to every existing guard. The normalizer's
+    content-preservation assertion passed and `git diff --numstat` reported
+    111 added / 0 removed — both are about TEXT, and this defect adds a blank
+    line and changes no text. It was caught only by counting conformance
+    before and after: 193 -> 228 non-conforming, all 36 regressions being the
+    build tasks `convert-unbulleted-fields.py` had fixed the day before.
+
+    ★ [DEC-048] arriving from the other side. That decision put the grammar in
+    one shared module so three scripts could not give three answers. The
+    grammar DID gain the third kind — `TASK_FIELDS` has been in
+    `ledger_contract.py` since 2026-08-20 — but this writer never read it. A
+    shared definition only unifies the readers that consult it.
+
+    ⚠️ Detection is `ledger-lint.py`'s exactly: a NON-EMPTY, exactly-labeled
+    `Task` field. `Task (original)` and `Task (2026-07-13 PM)` deliberately do
+    NOT match — those three entries need a rename that keeps every word, which
+    belongs to the single writer, and silently treating them as tasks here
+    would settle a question nobody has ruled on.
+    """
+    if registry:
+        return REGISTRY_FIELDS
+    if (fields.get("Task") or "").strip():
+        return TASK_FIELDS
+    return ENTRY_FIELDS
+
+
+def emit_entry(entry_id, title, fields, body="", tldr="", registry=False,
+               extras=()):
     """The canonical rendering. Importable — the normalizer calls this directly.
 
     `fields` is a mapping; order comes from the spec, never from the caller.
+
+    `extras` are labeled lines the entry carried in its leading run that are not
+    spec fields — `**Type:**` is the common one, on 42 entries in fran-dash.
+    They are emitted VERBATIM, immediately after the spec fields and with no
+    blank line between, because a blank line ends the field run
+    (`ledger-lint.py:319-321`) and check 9 explicitly permits extra labeled
+    bullets after the required prefix.
+
+    ⚠️ Passing them through `body` instead is what the normalizer used to do,
+    and it is why re-emitting a build task detached its `Type` line from the
+    run and inserted two blank lines into 36 entries that had just been
+    converted. Keeping them adjacent makes the re-emit a no-op on an entry that
+    was already in shape — which is the property that lets the normalizer be
+    run repeatedly without churning the file.
     """
-    spec = REGISTRY_FIELDS if registry else ENTRY_FIELDS
+    spec = entry_spec(fields, registry)
     out = [f"{'#' * ENTRY_LEVEL} {entry_id} {title}".rstrip()]
     for name, _required in spec:
         val = (fields.get(name) or "").strip()
         if val:
             out.append(f"- **{name}:** {val}")
+    out += [l for l in extras if l.strip()]
     body = (body or "").strip("\n")
     if body:
         out += ["", body]
@@ -111,10 +166,15 @@ def validate(spec_in):
         if label in FIELD_SYNONYMS:
             p.append(f"field {label!r} was renamed to {FIELD_SYNONYMS[label]!r} — "
                      f"use the canonical label")
-        elif label not in {n for n, _ in ENTRY_FIELDS} | {n for n, _ in REGISTRY_FIELDS}:
+        elif label not in ({n for n, _ in ENTRY_FIELDS}
+                           | {n for n, _ in REGISTRY_FIELDS}
+                           | {n for n, _ in TASK_FIELDS}):
             p.append(f"field {label!r} is not in the spec")
 
-    required = ([n for n, r in REGISTRY_FIELDS if r] if registry else REQUIRED_FIELDS)
+    # ⚠️ Held to the SAME spec `emit_entry` will render with, chosen by the same
+    # function. Validating against one set and rendering with another is how a
+    # writer starts emitting entries its own checker rejects.
+    required = [n for n, r in entry_spec(fields, registry) if r]
     for name in required:
         if not (fields.get(name) or "").strip():
             p.append(f"required field {name!r} is missing or empty")
