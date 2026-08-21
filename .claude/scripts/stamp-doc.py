@@ -259,6 +259,187 @@ def lint_shadow_chain(text):
     ]
 
 
+# ⛔ THE ONE THING THIS FILE CANNOT SEE FROM THE FILE ITSELF: a stamp that used
+# to exist and no longer does. Every other check here is internal consistency —
+# is the fold well-formed, is the current stamp closed, is there a shadow chain.
+# A stamp that was silently dropped leaves a perfectly valid file behind.
+#
+# ✅ Measured 2026-08-21 on this repo: 24 distinct stamps had existed across the
+# history of `docs/CURRENT_STATUS.md`; **8 were present.** Sixteen were gone,
+# lost at a rate of exactly ONE PER COMMIT between 2026-07-14 and 2026-07-31 —
+# the era before this script, when a session hand-prepended its stamp and
+# REPLACED the previous one instead of accumulating it. Nothing has been lost
+# since; the fold and roll-down work. But nothing noticed the old loss either,
+# and the file that is supposed to be the permanent record read as healthy.
+#
+# ★ git is the only witness. The audit asks it what stamps this doc has ever
+# carried and fails if any of them is absent from the doc plus its history file.
+AUDIT_DATE_RE = re.compile(
+    r"_(?:Last updated|Prior:)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[A-Z]{2,5})")
+
+
+def _git(args, cwd):
+    import subprocess
+    r = subprocess.run(["git"] + args, cwd=cwd, capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ""
+
+
+def audit_history(doc: Path):
+    """Every stamp git has ever seen for this doc must still be present.
+
+    Returns (problems, checked, ever). `checked` is False when the audit could
+    not run — not a git repo, or git unavailable — and the caller MUST say so
+    rather than printing a clean result. A checker that silently skips is the
+    failure it exists to catch.
+    """
+    root = doc.resolve().parent
+    while root != root.parent and not (root / ".git").exists():
+        root = root.parent
+    if not (root / ".git").exists():
+        return [], False, set()
+
+    hist = doc.parent / "history" / f"{doc.stem}-stamp-history.md"
+    rels = []
+    for f in (doc, hist):
+        try:
+            rels.append(str(f.resolve().relative_to(root)))
+        except ValueError:
+            return [], False, set()
+
+    ever = set()
+    revs = _git(["log", "--format=%H", "--", rels[0]], root).split()
+    if not revs:
+        return [], False, set()
+    for rev in revs:
+        for rel in rels:
+            for m in AUDIT_DATE_RE.finditer(_git(["show", f"{rev}:{rel}"], root)):
+                ever.add(m.group(1).strip())
+
+    now = set()
+    for f in (doc, hist):
+        if f.exists():
+            for m in AUDIT_DATE_RE.finditer(f.read_text(encoding="utf-8")):
+                now.add(m.group(1).strip())
+
+    lost = sorted(ever - now)
+    if not lost:
+        return [], True, ever
+    shown = ", ".join(lost[:6]) + (f" … and {len(lost) - 6} more" if len(lost) > 6 else "")
+    return ([f"{len(lost)} stamp(s) that exist in git history are ABSENT from this "
+             f"doc and its stamp-history file — {shown}. Recover them with "
+             f"`git log -p -- {rels[0]}`; this file is append-only and nothing "
+             f"may leave it."], True, ever)
+
+
+def restore_history(doc: Path, apply=False):
+    """Recover stamps that exist in git but not in the files, VERBATIM.
+
+    ⛔ Recovery is append-only and text-preserving by construction: each stamp is
+    taken byte-for-byte from the revision where it was current, only its
+    `_Last updated ` prefix rewritten to `_Prior: ` so it reads as history. No
+    stamp already present is touched, and none is ever removed.
+
+    ⚠️ Restoring by hand does not scale and is how MORE get lost — 130 were
+    missing across three repos when this was written.
+    """
+    root = doc.resolve().parent
+    while root != root.parent and not (root / ".git").exists():
+        root = root.parent
+    if not (root / ".git").exists():
+        return [], "not a git repo"
+
+    hist = doc.parent / "history" / f"{doc.stem}-stamp-history.md"
+    rel = str(doc.resolve().relative_to(root))
+    hrel = str(hist.resolve().relative_to(root))
+
+    line_re = re.compile(
+        r"^\s*(?:[-*]\s+)?_(?:Last updated|Prior:)\s+"
+        r"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[A-Z]{2,5}).*?_\s*$", re.M)
+    # ⛔ Historical revisions include the LEGACY ONE-LINE BLOB era, where several
+    # stamps were concatenated onto a single line — the 5,556-character line this
+    # script was written to end. A line-anchored regex sees one stamp there and
+    # misses the rest: 8 of the 130 losses were invisible to the first version of
+    # this function for exactly that reason.
+    #
+    # ★ `split_blob` is the parser that already knows that shape, including the
+    # repair for a prior that lost its leading `_`. Reusing it is the point —
+    # a second private parser here is how one file starts giving two answers.
+    def stamps_in(text):
+        out = {}
+        for line in text.split("\n"):
+            if not AUDIT_DATE_RE.search(line):
+                continue
+            candidates = [line]
+            if len(PRIOR_SPLIT.findall(line)) > 0:
+                try:
+                    cur, priors, _ = split_blob(line.lstrip("-* ").strip())
+                    candidates = [cur] + priors
+                except StampError:
+                    pass
+            for c in candidates:
+                m = AUDIT_DATE_RE.search(c)
+                if m:
+                    out.setdefault(m.group(1).strip(), c.strip())
+        return out
+
+    found = {}
+    for rev in _git(["log", "--format=%H", "--", rel], root).split():
+        for r in (rel, hrel):
+            for d, t in stamps_in(_git(["show", f"{rev}:{r}"], root)).items():
+                found.setdefault(d, t)
+
+    present = set()
+    for f in (doc, hist):
+        if f.exists():
+            for m in AUDIT_DATE_RE.finditer(f.read_text(encoding="utf-8")):
+                present.add(m.group(1).strip())
+
+    missing = {d: t for d, t in found.items() if d not in present}
+
+    # ⚠️ A rewrite is also warranted with NOTHING missing: the history file may
+    # already hold blob lines that need splitting. Returning early on `missing`
+    # alone left 19 of them in place and reported "nothing to restore" — a clean
+    # message over a file still carrying the shape this script exists to remove.
+    blobs = 0
+    if hist.exists():
+        for m in re.finditer(r"^- _Prior:.*$", hist.read_text(encoding="utf-8"), re.M):
+            if len(AUDIT_DATE_RE.findall(m.group(0))) > 1:
+                blobs += 1
+    if (not missing and not blobs) or not apply:
+        return sorted(missing), None
+
+    rows = []
+    if hist.exists():
+        body = hist.read_text(encoding="utf-8")
+        head, _, _ = body.partition("- _Prior:")
+        # ⛔ EXISTING rows are split too, not just recovered ones. A history file
+        # can already CONTAIN blob lines — 19 of them in fran-dash — either
+        # rolled down from the blob era or re-imported whole by a restore that
+        # predated the split. Leaving them is leaving the exact shape this
+        # script exists to eliminate, in the file that is meant to be the
+        # permanent record. Splitting here makes `--restore` self-healing and
+        # idempotent: a line already carrying one stamp passes through untouched.
+        for m in re.finditer(r"^- _Prior:.*$", body, re.M):
+            line = m.group(0)
+            for t in stamps_in(line).values():
+                d = AUDIT_DATE_RE.search(t)
+                if d:
+                    t = re.sub(r"^_Last updated ", "_Prior: ", t.lstrip("-* ").strip())
+                    rows.append((d.group(1).strip(), "- " + t))
+    else:
+        hist.parent.mkdir(parents=True, exist_ok=True)
+        head = history_header(doc.name, "")
+    for d, txt in missing.items():
+        t = txt.lstrip("-* ").strip()
+        t = re.sub(r"^_Last updated ", "_Prior: ", t)
+        rows.append((d, "- " + t))
+
+    rows.sort(key=lambda r: r[0], reverse=True)   # newest first, as the file states
+    hist.write_text(head.rstrip("\n") + "\n\n" + "\n".join(t for _, t in rows) + "\n",
+                    encoding="utf-8")
+    return sorted(missing), None
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -271,6 +452,8 @@ def main():
     ap.add_argument("--convert-only", action="store_true",
                     help="reshape the existing chain, add no new stamp")
     ap.add_argument("--check", action="store_true", help="lint only, never write")
+    ap.add_argument("--restore", action="store_true",
+                    help="recover stamps present in git but absent from the files")
     ap.add_argument("--dry-run", action="store_true",
                     help="print what would be written, write nothing")
     args = ap.parse_args()
@@ -279,10 +462,37 @@ def main():
         sys.exit(f"error: {args.doc} not found")
     original = args.doc.read_text(encoding="utf-8")
 
+    if args.restore:
+        missing, why = restore_history(args.doc, apply=not args.dry_run)
+        if why:
+            print(f"⚠ {args.doc}: cannot restore — {why}")
+            sys.exit(2)
+        if not missing:
+            print(f"✓ {args.doc}: nothing to restore")
+        else:
+            verb = "would restore" if args.dry_run else "restored"
+            print(f"✓ {args.doc}: {verb} {len(missing)} stamp(s) — "
+                  f"{missing[0]} … {missing[-1]}")
+        sys.exit(0)
+
     if args.check:
         problems = lint(original, args.doc)
+        # ⛔ The audit runs as part of --check, not behind its own flag. A guard
+        # that has to be remembered is the one that was missing here for five
+        # weeks while sixteen stamps went out of the file.
+        lost, checked, ever = audit_history(args.doc)
+        problems += lost
         for p in problems:
             print(f"✗ {args.doc}: {p}")
+        # ⚠️ A checker must NAME WHAT IT DID NOT CHECK. Silence has to mean
+        # "nothing there", never "I could not look" -- otherwise the tool built
+        # to catch a silent loss becomes another way to have one.
+        if not checked:
+            print(f"⚠ {args.doc}: history audit NOT run (no git repo, or the doc "
+                  f"has no commits) — loss of an old stamp cannot be detected here")
+        elif not lost:
+            print(f"✓ {args.doc}: history audit — all {len(ever)} stamp(s) ever "
+                  f"committed are still present")
         if not problems:
             print(f"✓ {args.doc}: stamp block is well-formed")
         sys.exit(1 if problems else 0)

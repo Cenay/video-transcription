@@ -17,7 +17,28 @@ This guide governs how documentation is written across projects, so that docs re
 - Show both simple and complex use cases.
 - Include expected output where relevant.
 
-### 3. Honesty About Limitations
+### 3. A history file may grow without limit; it may never lose an entry
+
+**Ruled 2026-08-21 by Cenay:** *"I would rather the file grow uncontrollably than lose details like this."*
+
+⛔ **Growth is not a cost worth trading a record for.** Where a rule could go either way — cap the file or keep everything — **keep everything.** An oversized history file is an inconvenience someone can fix in an afternoon; a missing entry is unrecoverable the moment the git object ages out, and it is invisible while it happens.
+
+★ **This is a ruling about DEFAULTS, not a ban on folds.** The `<details>` fold and the roll-down to `history/` are fine and stay — they move entries out of the reader's way. **The distinction is MOVE versus DROP:** a stamp leaving the fold must arrive in the history file, and a session block leaving `CURRENT_STATUS.md` must arrive in the archive. Nothing may simply cease.
+
+✅ **Measured 2026-08-21, which is why this is a rule and not a preference: 130 traceability stamps had been lost** — 39 in the toolkit, 83 in `fran-dash`, 8 in `trfaapi.com` — at roughly one per commit through 2026-07, when sessions hand-prepended a stamp and **replaced** the previous one instead of accumulating it. All 130 were recovered from git, but only because git still held them.
+
+⛔ **Every guard in place at the time passed the whole way through**, because each one checks the file in front of it: is the fold well-formed, is the current stamp closed, is there a shadow chain. ★ **A record that was already gone leaves a perfectly valid file behind** — the loss is invisible to any check that reads only the artifact.
+
+**So the guard has to ask something outside the file.** `stamp-doc.py --check` now runs a git-backed audit: every stamp git has ever seen for a doc must still be present in it or its history file, or the check fails and names the missing ones. `--restore` recovers them verbatim. ⚠️ **And when the audit cannot run — no git repo, no commits — it says `audit NOT run` rather than printing a clean result**, because a checker that skips silently is how a loss goes unnoticed for five weeks in three repos.
+
+**What this means when you are writing a tool that touches these files:**
+
+- **Relocate, never delete.** If a line leaves one file it lands in another, and an assertion proves it.
+- ⛔ **Never cap a history file.** No `--keep` on the archive, no retention window on `-stamp-history.md`, no "prune old entries" pass.
+- **A display cap is fine; a write cap is not.** Truncating a line in a printed report is courtesy. Truncating it on the way to disk is data loss.
+- **If you must choose between a file that is awkwardly large and one that is quietly incomplete, choose large.**
+
+### 4. Honesty About Limitations
 - Be upfront about what you can and cannot do.
 - Don't pretend to complete actions that failed.
 - Admit when you don't have the information (see "Don't Know" Situations below).
