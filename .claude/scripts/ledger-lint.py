@@ -154,18 +154,53 @@ class Report:
         if not self.quiet:
             print(f"  ✓ {name}{(' — ' + detail) if detail else ''}")
 
+    # ⛔ ONE cap and ONE emitter, shared by both lanes. They used to disagree —
+    # fail() showed 15 and said "… and N more"; warn() showed 10 and said
+    # NOTHING — so a warning list was silently truncated. That is the failure
+    # this checker exists to catch, in the checker itself: silence has to mean
+    # "nothing there", never "I stopped counting".
+    #
+    # ⚠️ Measured 2026-08-20 on fran-dash: check 9 produces 16 findings once the
+    # ledger is normalized, and check 6 produces 336. So the cap must hold the
+    # first comfortably while still bounding the second — and the overflow line
+    # is what makes the bound honest rather than invisible.
+    LIST_CAP = 25
+
+    def _items(self, items):
+        items = list(items)
+        for it in items[:self.LIST_CAP]:
+            print(f"      {it}")
+        if len(items) > self.LIST_CAP:
+            print(f"      … and {len(items) - self.LIST_CAP} more "
+                  f"(showing {self.LIST_CAP} of {len(items)})")
+
     def fail(self, name, detail, items=()):
         self.failed += 1
         print(f"  ✗ {name} — {detail}")
-        for it in list(items)[:15]:
-            print(f"      {it}")
-        if len(list(items)) > 15:
-            print(f"      … and {len(list(items)) - 15} more")
+        self._items(items)
 
     def warn(self, name, detail, items=()):
         print(f"  ⚠ {name} — {detail}")
-        for it in list(items)[:10]:
-            print(f"      {it}")
+        self._items(items)
+
+
+def _exists(p):
+    """`Path.exists()` that cannot take the whole run down.
+
+    ⛔ It RAISES rather than returning False when a parent directory is not
+    readable — and check 6 probes sibling directories it does not own. Found
+    2026-08-20: linting inside a `/tmp` working directory made `/tmp`'s
+    root-owned `systemd-private-*` folders the "siblings", and the run died
+    with a `PermissionError` traceback part-way through, after printing three
+    green checks. ★ A checker that exits non-zero with a stack trace is
+    indistinguishable, to a caller reading only the exit code, from one that
+    found a real defect. Unreadable means "cannot confirm it is there", which
+    for this check is the same answer as absent.
+    """
+    try:
+        return p.exists()
+    except OSError:
+        return False
 
 
 def find_ledger(explicit):
@@ -672,17 +707,17 @@ def main():
             # actually resolves. The ledger lives in docs/, so `history/foo.md`
             # means `docs/history/foo.md`. Checking only repo-root-relative paths
             # reported 154 of these as broken when every one of them worked.
-            if (ledger.parent / p).exists():
+            if _exists(ledger.parent / p):
                 continue
             # Prefixed with a sibling repo's name — `dashboard/CLAUDE.md`. Resolves.
-            if (root.parent / p).exists():
+            if _exists(root.parent / p):
                 cross.add(p.split("/")[0])
                 continue
             # UNPREFIXED but present in a sibling — `docs/SCHEMA.md` meaning
             # `migration/docs/SCHEMA.md`. The file exists, so this is not a broken
             # link; but a reader in THIS repo who follows it finds nothing, so it
             # is not clean either. Its own class: real debt, not an emergency.
-            hit = next((s.name for s in siblings if (s / p).exists()), None)
+            hit = next((s.name for s in siblings if _exists(s / p)), None)
             if hit:
                 ambiguous.setdefault(hit, set()).add(p)
                 continue
