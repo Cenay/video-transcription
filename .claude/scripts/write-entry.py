@@ -120,6 +120,29 @@ def emit_entry(entry_id, title, fields, body="", tldr="", registry=False,
         val = (fields.get(name) or "").strip()
         if val:
             out.append(f"- **{name}:** {val}")
+    # ⛔ NOTHING CAPTURED MAY BE SILENTLY DROPPED. A spec label that is not in
+    # THIS entry's spec still has to be written — the three kinds have three
+    # different field sets, so `Decided` is a spec label on a decision and a
+    # leftover on a build task. Emitting only `spec` means the caller hands us
+    # a value and we quietly lose it.
+    #
+    # ✅ Measured 2026-08-21, and this is the second half of the same defect the
+    # rest of this file is about. `DEC-105` is a build task that also carries a
+    # `Decided`; once `entry_spec` correctly selected `TASK_FIELDS`, `Decided`
+    # was captured as a field and then never emitted. The normalizer's
+    # content-preservation assertion caught it — "the value of 'Decided' did
+    # not survive verbatim" — and REFUSED the whole ledger, which is the safety
+    # net working exactly as designed and also a total block on every further
+    # `--field-map` run until this line existed.
+    #
+    # ★ It is worth noting the failure was PREDICTED in a comment in
+    # `normalize-ledger.py` before it happened, about `Task` rather than
+    # `Decided` — "captured as a field and then never emitted, a silent
+    # DELETION". Writing the hazard down did not prevent walking into it; the
+    # assertion did.
+    seen = {n for n, _ in spec}
+    out += [f"- **{k}:** {v.strip()}" for k, v in fields.items()
+            if k not in seen and (v or "").strip()]
     out += [l for l in extras if l.strip()]
     body = (body or "").strip("\n")
     if body:
