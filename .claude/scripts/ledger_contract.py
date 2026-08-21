@@ -216,6 +216,27 @@ FIELD_SYNONYMS = {
 # required set and from the restatement.
 REGISTRY_FIELDS = (("Status", True), ("Decided", True), ("Owner", True))
 
+# THE THIRD ENTRY KIND. Ruled 2026-08-20 by Cenay: a build task carried into the
+# ledger is not a decision, and the decision template does not fit it.
+#
+# ⛔ WHY THIS IS NOT A LOOPHOLE. 42 entries in fran-dash say so in their own
+# text — `**Type:** Build task carried forward (confirmed work, not a decision)`
+# — and carry a `Task` line instead of Question/Answer/Why. Forcing the decision
+# shape onto "Run the four scope-scan greps" would manufacture a question, an
+# answer and a rationale that exist to satisfy the checker rather than to inform
+# anyone. That is the same fabrication the unrecoverable sentinel exists to
+# avoid, arriving from the other direction.
+#
+# ★ The precedent is REGISTRY_FIELDS directly above: this ledger already
+# tolerates a second kind of entry with its own required set, for the same
+# reason — the thing being recorded is not a decision. A third kind with the
+# same justification is consistency, not an exception.
+#
+# ⚠️ Detected from the presence of a `Task` field, the way a registry stub is
+# detected from REGISTRY in its Status. Self-describing: an entry declares what
+# it is by what it carries, so nothing external has to hold a list.
+TASK_FIELDS = (("Added", True), ("Status", True), ("Task", True))
+
 
 def entry_template(entry_id="DEC-NNN", title="<short title — no date, no ID repeated>"):
     """The canonical skeleton, generated from the spec above.

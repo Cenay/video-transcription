@@ -41,7 +41,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from ledger_contract import (  # noqa: E402
     ADDED_BACKFILL, ADDED_STAMP_RE, ENTRY_LEVEL, FIELD_SYNONYMS,
-    ID_PATTERN, REGISTRY_FIELDS, REQUIRED_FIELDS, STATUS_WORDS, TLDR_MAX_WORDS,
+    ID_PATTERN, REGISTRY_FIELDS, REQUIRED_FIELDS, STATUS_WORDS, TASK_FIELDS,
+    TLDR_MAX_WORDS,
     TLDR_QUOTED_RE, TLDR_RE, body_tail, entry_bodies, fenced_lines,
     parse_entries, tldr_findings,
 )
@@ -294,6 +295,7 @@ def check_shape(r, lines, entries):
     adopting, _ = adopting_state(lines)
     required = list(REQUIRED_FIELDS)
     reg_required = [n for n, req in REGISTRY_FIELDS if req]
+    task_required = [n for n, req in TASK_FIELDS if req]
 
     findings, conforming = {}, []
 
@@ -331,8 +333,13 @@ def check_shape(r, lines, entries):
         labels = [m.group("label").strip() for m in run]
         status_val = next((m.group("value") for m in run
                            if m.group("label").strip() == "Status"), "")
+        # Three entry kinds, each with its own required prefix. A stub declares
+        # itself in its Status; a build task declares itself by carrying a
+        # `Task` line. ⚠️ Order matters only in that a registry stub never has
+        # a Task, so the two tests cannot both fire.
         registry = "REGISTRY" in status_val.upper()
-        want = reg_required if registry else required
+        is_task = "Task" in labels
+        want = reg_required if registry else task_required if is_task else required
 
         # ⛔ ONLY the required prefix is held to the shape. Everything after it is
         # free — the ruling allows extra bold-labeled paragraphs, and they are
