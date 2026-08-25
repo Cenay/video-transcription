@@ -35,6 +35,7 @@ Usage:
 """
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -192,7 +193,47 @@ def parse_doc(text):
     return lines[:idx], current, priors, lines[end:], had_fold, repairs
 
 
-def render_fold(priors, history_name):
+# ⛔ ALL STAMP HISTORY GOES TO <docs-root>/history/ — ruled by Cenay 2026-08-25.
+#
+# This used to be `doc.parent / "history"`, which is right for a doc already
+# inside docs/ and WRONG for one at the repo root: stamping fran-dash's
+# CLAUDE.md and README.md put their chains in a stray `history/` beside the
+# source tree, split from the 13 files already in docs/history/.
+#
+# ★ The rule now comes from doc_root.py, which exists to be THE single source of
+# "where do a repo's docs live" — docs/ under /mnt/k/Code, .cloaked/docs/ under
+# /mnt/k/_Sites. Deriving it independently here is what produced the split.
+def history_path(doc):
+    """The stamp-history file for `doc`, always under <docs-root>/history/."""
+    doc = Path(doc).resolve()
+    repo = doc.parent
+    while repo != repo.parent and not (repo / ".git").exists():
+        repo = repo.parent
+    if (repo / ".git").exists():
+        droot = None
+        try:
+            import sys as _sys
+            _sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from doc_root import doc_root as _doc_root
+            droot = repo / _doc_root(repo)
+        except Exception:
+            droot = repo / "docs"
+        if droot and droot.is_dir():
+            return droot / "history" / f"{doc.stem}-stamp-history.md"
+    return doc.parent / "history" / f"{doc.stem}-stamp-history.md"
+
+
+def _fold_rel(doc, hist):
+    """How the history file should be WRITTEN in the fold — relative to the doc,
+    so a reader (and VS Code) can follow it. `history/X.md` for a doc already in
+    docs/; `docs/history/X.md` for one at the repo root."""
+    try:
+        return os.path.relpath(Path(hist).resolve(), Path(doc).resolve().parent)
+    except Exception:
+        return Path(hist).name
+
+
+def render_fold(priors, history_rel):
     if not priors:
         return []
     n = len(priors)
@@ -201,7 +242,7 @@ def render_fold(priors, history_name):
         FOLD_START,
         f"<summary>📜 <strong>Stamp history</strong> — the {n} previous "
         f"update{'s' if n != 1 else ''} (older ones: "
-        f"<code>history/{history_name}</code>)</summary>",
+        f"<code>{history_rel}</code>)</summary>",
         "",
         *[f"- {p}" for p in priors],
         "",
@@ -358,7 +399,7 @@ def audit_history(doc: Path):
     if not (root / ".git").exists():
         return [], False, set()
 
-    hist = doc.parent / "history" / f"{doc.stem}-stamp-history.md"
+    hist = history_path(doc)
     rels = []
     for f in (doc, hist):
         try:
@@ -408,7 +449,7 @@ def restore_history(doc: Path, apply=False):
     if not (root / ".git").exists():
         return [], "not a git repo", None
 
-    hist = doc.parent / "history" / f"{doc.stem}-stamp-history.md"
+    hist = history_path(doc)
     rel = str(doc.resolve().relative_to(root))
     hrel = str(hist.resolve().relative_to(root))
 
@@ -659,7 +700,7 @@ def main():
             # rather than reporting a clean result.
             print(f"⚠ {args.doc}: the file got SHORTER "
                   f"({did['lines_before']} → {did['lines_after']}) — inspect it "
-                  f"before committing; `git diff -- {args.doc.parent}/history/`")
+                  f"before committing; `git diff -- {history_path(args.doc).parent}`")
         sys.exit(0)
 
     if args.check:
@@ -726,12 +767,12 @@ def main():
 
     keep, roll = priors[: args.keep], priors[args.keep:]
 
-    hist_dir = args.doc.parent / "history"
+    hist_dir = history_path(args.doc).parent
     hist_path = hist_dir / f"{args.doc.stem}-stamp-history.md"
     existing_hist = hist_path.read_text(encoding="utf-8") if hist_path.is_file() else None
     new_hist = merge_history(existing_hist, roll, args.doc.name)
 
-    new_doc = "\n".join(pre + [current] + render_fold(keep, hist_path.name) + post)
+    new_doc = "\n".join(pre + [current] + render_fold(keep, _fold_rel(args.doc, hist_path)) + post)
 
     # Verification (spec section 4): every prior that existed before this run must
     # appear exactly once across {parent, history}. Move, never delete.
@@ -744,7 +785,7 @@ def main():
 
     if args.dry_run:
         print(f"--- {args.doc} (current + {len(keep)} folded) ---")
-        print("\n".join(new_doc.split("\n")[: len(pre) + 1 + len(render_fold(keep, hist_path.name))]))
+        print("\n".join(new_doc.split("\n")[: len(pre) + 1 + len(render_fold(keep, _fold_rel(args.doc, hist_path)))]))
         print(f"\n--- {hist_path} ({len(roll)} rolled down) ---")
         print("\n".join((new_hist or "").split("\n")[:12]))
     else:

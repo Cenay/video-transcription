@@ -97,6 +97,31 @@ r, _ = run(body, "--check")
 check("--check still exits non-zero", r.returncode != 0, f"exit={r.returncode}")
 check("still refuses rather than guesses", "Refusing to guess" in (r.stdout + r.stderr))
 
+print("4d. ALL stamp history goes to <docs-root>/history/, wherever the doc lives")
+# Was `doc.parent / "history"`, so stamping a ROOT-level CLAUDE.md created a
+# stray `history/` beside the source tree, split from the files in docs/history/.
+# Ruled 2026-08-25: all history for all files goes to the docs root.
+import os as _os
+d = pathlib.Path(tempfile.mkdtemp()); (d / "docs").mkdir()
+subprocess.run(["git", "init", "-q", "."], cwd=d, capture_output=True)
+(d / "CLAUDE.md").write_text(f"# T\n\n{STAMP_A}\n\nbody\n", encoding="utf-8")
+for i in range(4):
+    subprocess.run([sys.executable, SCRIPT, str(d / "CLAUDE.md"), "--stamp",
+                    f"_Last updated 2026-08-25 1{i}:00 MST by an AI session · transcript: `c{i}`_"],
+                   cwd=d, capture_output=True)
+check("a ROOT doc creates NO stray history/ at the repo root", not (d / "history").exists())
+check("its history lands in docs/history/", (d / "docs" / "history" / "CLAUDE-stamp-history.md").exists())
+fold = [l for l in (d / "CLAUDE.md").read_text(encoding="utf-8").split("\n") if "<code>" in l]
+check("and the fold names that path from the doc",
+      bool(fold) and "docs/history/" in fold[0], fold[0][:80] if fold else "no fold")
+(d / "docs" / "X.md").write_text(f"# X\n\n{STAMP_A}\n\nbody\n", encoding="utf-8")
+for i in range(4):
+    subprocess.run([sys.executable, SCRIPT, str(d / "docs" / "X.md"), "--stamp",
+                    f"_Last updated 2026-08-26 1{i}:00 MST by an AI session · transcript: `d{i}`_"],
+                   cwd=d, capture_output=True)
+check("a doc already in docs/ is unaffected",
+      (d / "docs" / "history" / "X-stamp-history.md").exists())
+
 print("5. control — a well-formed doc still passes and still stamps")
 body = ("# T\n\n**Snapshot:** 2026-08-25 09:00 MST (session 99)\n\n" + STAMP_A + "\n")
 r, f = run(body, "--stamp", NEW)
