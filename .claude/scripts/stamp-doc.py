@@ -46,12 +46,30 @@ from pathlib import Path
 # which would split a single stamp into a stray `_` plus its body.
 PRIOR_SPLIT = re.compile(r"(?=(?<!_)_?Prior: \d{4}-\d{2}-\d{2})")
 PRIOR_LINT = re.compile(r"^- _Prior: \d{4}-\d{2}-\d{2} \d{2}:\d{2} [A-Z]{2,5}(?![A-Z])")
-# Two header forms exist in the wild -- the italic `_Last updated ...` one and a
-# bold `**Last updated:** ...` variant. Both are accepted and each doc keeps the
-# form it already uses; resume.md and every existing grep target this line.
+# THE STAMP IS THE ITALIC FORM. ONE SHAPE, NO ALTERNATIVES.
+#
+# This regex used to accept a bold `**Last updated:** ...` variant as well, so a
+# doc carrying BOTH -- CURRENT_STATUS.md carries a one-line snapshot above its
+# real stamp -- produced two candidates, and find_current broke the tie by
+# looking for the word `transcript:` in the prose. ⛔ Reproduced 2026-08-25: a
+# snapshot line that merely CONTAINS `transcript:` wins the tie, gets consumed
+# and rewritten as `- _Prior:` inside the stamp fold, and the real stamp is left
+# orphaned below `</details>` -- while --check reported "well-formed", exit 0.
+#
+# The two lines were never two renderings of one record. They are two different
+# records that shared a label. The snapshot is now `**Snapshot:**` (SNAPSHOT_RE
+# below), so the collision cannot occur and the tiebreak is gone.
+# group(1) is the literal prefix and demote() relies on it to rewrite a current
+# stamp into a `_Prior:` row -- keep the group even though there is one branch.
 CURRENT_RE = re.compile(
-    r"^(_Last updated |\*\*Last updated:\*\* )\d{4}-\d{2}-\d{2} \d{2}:\d{2} [A-Z]{2,5}(?![A-Z])"
+    r"^(_Last updated )\d{4}-\d{2}-\d{2} \d{2}:\d{2} [A-Z]{2,5}(?![A-Z])"
 )
+# The one-line snapshot. NOT a stamp: no fold, no roll-down, no prior chain.
+# Recognised only so the linter can say so out loud; never a stamp candidate.
+SNAPSHOT_RE = re.compile(r"^\*\*Snapshot:\*\* \d{4}-\d{2}-\d{2} \d{2}:\d{2} [A-Z]{2,5}(?![A-Z])")
+# The superseded label, kept ONLY to give a precise error instead of a silent
+# miss while other repos are migrated. See LEGACY_SNAPSHOT_RE's use in lint().
+LEGACY_SNAPSHOT_RE = re.compile(r"^\*\*Last updated:\*\* \d{4}-\d{2}-\d{2} \d{2}:\d{2} [A-Z]{2,5}(?![A-Z])")
 FOLD_START = "<details>"
 FOLD_END = "</details>"
 SUMMARY_RE = re.compile(r"^<summary>📜 <strong>Stamp history</strong>")
@@ -118,16 +136,21 @@ def parse_doc(text):
     preserves newest-first ordering in the mixed case.
     """
     lines = text.split("\n")
-    # A doc can hold more than one "Last updated" line -- CURRENT_STATUS.md has a
-    # bold session-summary line above its real stamp. The traceability stamp is
-    # the one carrying a `transcript:` pointer; prefer it, then the italic form.
+    # ONE shape means at most one candidate. A second `_Last updated` line is a
+    # malformed doc -- it is what the old tiebreak used to produce silently --
+    # so refuse to write rather than pick one and hope.
     cands = [i for i, l in enumerate(lines) if CURRENT_RE.match(l)]
     if not cands:
         raise NoStampError("no `_Last updated YYYY-MM-DD HH:MM TZ ...` line found")
-    idx = next(
-        (i for i in cands if "transcript:" in lines[i]),
-        next((i for i in cands if lines[i].startswith("_")), cands[0]),
-    )
+    if len(cands) > 1:
+        where = ", ".join(f"line {i + 1}" for i in cands)
+        raise NoStampError(
+            f"{len(cands)} `_Last updated ...` lines found ({where}) — a doc has "
+            f"exactly ONE stamp. If one of these is the one-line snapshot, relabel "
+            f"it `**Snapshot:** ...`; if one is an orphan left by an older version "
+            f"of this script, delete it. Refusing to guess which is the stamp."
+        )
+    idx = cands[0]
 
     current, priors, repairs = split_blob(lines[idx])
 
@@ -227,10 +250,30 @@ def lint(text, path):
         if not PRIOR_LINT.match("- " + p):
             problems.append(f"malformed prior: {p[:70]}")
     problems.extend(lint_shadow_chain(text))
+    problems.extend(lint_legacy_snapshot(text))
     return problems
 
 
-# A doc may legitimately carry a bold `**Last updated:**` summary line ABOVE the
+def lint_legacy_snapshot(text):
+    """A one-line snapshot still carrying the retired `**Last updated:**` label.
+
+    Not fatal on its own -- the line is now inert to this script, which is the
+    point. But it is reported, because a doc holding BOTH that label and an
+    italic stamp is the exact shape that used to corrupt: two records, one name.
+    Silence here would mean a repo could sit half-migrated and look finished.
+    """
+    hits = [i for i, l in enumerate(text.split("\n")) if LEGACY_SNAPSHOT_RE.match(l)]
+    if not hits:
+        return []
+    where = ", ".join(f"line {i + 1}" for i in hits)
+    return [
+        f"snapshot line still labelled `**Last updated:**` ({where}) — that label "
+        f"is retired because it collided with the `_Last updated ...` stamp; "
+        f"relabel it `**Snapshot:** ...`"
+    ]
+
+
+# A doc may legitimately carry a bold `**Snapshot:**` summary line ABOVE the
 # real traceability stamp (see parse_doc) -- CURRENT_STATUS.md does. That line is
 # a one-line snapshot, and it is NOT a stamp chain: it has no fold, no roll-down
 # and no cap, so anything prepended to it grows forever.
@@ -254,7 +297,7 @@ def lint_shadow_chain(text):
     chars = sum(len(l) for l in hits)
     return [
         f"{len(hits)} standalone `_Prior:_` line(s) ({chars} chars) form a second, "
-        f"unbounded stamp chain outside the fold — the `**Last updated:**` snapshot "
+        f"unbounded stamp chain outside the fold — the `**Snapshot:**` line "
         f"takes NO prior chain; move the history to the fold or delete it as redundant"
     ]
 
@@ -346,7 +389,7 @@ def restore_history(doc: Path, apply=False):
     while root != root.parent and not (root / ".git").exists():
         root = root.parent
     if not (root / ".git").exists():
-        return [], "not a git repo"
+        return [], "not a git repo", None
 
     hist = doc.parent / "history" / f"{doc.stem}-stamp-history.md"
     rel = str(doc.resolve().relative_to(root))
@@ -382,11 +425,16 @@ def restore_history(doc: Path, apply=False):
                     out.setdefault(m.group(1).strip(), c.strip())
         return out
 
+    # ⚠️ LONGEST wins, not first-seen. The same stamp appears in many revisions
+    # and the wordings differ — one carries `by an AI session` or a `— what
+    # changed` clause and another does not. Taking whichever revision git
+    # happened to list first discards information at random.
     found = {}
     for rev in _git(["log", "--format=%H", "--", rel], root).split():
         for r in (rel, hrel):
             for d, t in stamps_in(_git(["show", f"{rev}:{r}"], root)).items():
-                found.setdefault(d, t)
+                if d not in found or len(t) > len(found[d]):
+                    found[d] = t
 
     present = set()
     for f in (doc, hist):
@@ -400,18 +448,54 @@ def restore_history(doc: Path, apply=False):
     # already hold blob lines that need splitting. Returning early on `missing`
     # alone left 19 of them in place and reported "nothing to restore" — a clean
     # message over a file still carrying the shape this script exists to remove.
-    blobs = 0
+    blobs = dupes = 0
     if hist.exists():
+        seen = set()
         for m in re.finditer(r"^- _Prior:.*$", hist.read_text(encoding="utf-8"), re.M):
-            if len(AUDIT_DATE_RE.findall(m.group(0))) > 1:
+            line = m.group(0)
+            if len(AUDIT_DATE_RE.findall(line)) > 1:
                 blobs += 1
-    if (not missing and not blobs) or not apply:
-        return sorted(missing), None
+            d = AUDIT_DATE_RE.search(line)
+            t = re.search(r"transcript:\s*`([^`]+)`", line)
+            if d:
+                k = (d.group(1).strip(), t.group(1) if t else line)
+                if k in seen:
+                    dupes += 1
+                seen.add(k)
+    # ⚠️ A rewrite is warranted by ANY of the three, and each was learned the
+    # hard way: `missing` alone left 19 blob lines in place, and `missing`+
+    # `blobs` left 57 duplicate rows in place — both reporting "nothing to
+    # restore" over a file that still needed work.
+    # ⛔ `did` is what this function DID, as distinct from what was MISSING.
+    # Reporting only `missing` is why the 2026-08-21 run printed
+    # "✓ nothing to restore" while rewriting six files and deleting 338 lines:
+    # no stamp was missing, so `missing` was empty, so main() said "nothing" --
+    # and the blob-split rewrite that actually ran was invisible to the caller.
+    # ★ A caller cannot report a write it was never told about.
+    did = {"wrote": False, "blobs_split": blobs, "dupes_merged": dupes,
+           "lines_before": 0, "lines_after": 0}
+    if (not missing and not blobs and not dupes) or not apply:
+        return sorted(missing), None, did
 
     rows = []
+    tail = ""
     if hist.exists():
         body = hist.read_text(encoding="utf-8")
         head, _, _ = body.partition("- _Prior:")
+        # ⛔ THE TAIL IS NOT OPTIONAL. This function rebuilt the file as
+        # `head + stamp rows` and dropped everything else on the floor. A
+        # history file carries an auto-generated `link-doc-refs` block at the
+        # BOTTOM, after the last stamp -- so every run deleted it silently.
+        # Measured 2026-08-24: 392 link definitions gone from 13 files across
+        # three repos, earliest 2026-08-11, and `--restore` printed
+        # "✓ nothing to restore" while deleting 16 lines in the reproduction.
+        # ★ Anything after the LAST stamp line is content this function does not
+        # understand, and not understanding it is not a licence to destroy it.
+        last = body.rfind("\n- _Prior:")
+        if last != -1:
+            nl = body.find("\n", last + 1)
+            if nl != -1:
+                tail = body[nl + 1:]
         # ⛔ EXISTING rows are split too, not just recovered ones. A history file
         # can already CONTAIN blob lines — 19 of them in fran-dash — either
         # rolled down from the blob era or re-imported whole by a restore that
@@ -429,15 +513,84 @@ def restore_history(doc: Path, apply=False):
     else:
         hist.parent.mkdir(parents=True, exist_ok=True)
         head = history_header(doc.name, "")
-    for d, txt in missing.items():
+    # ⛔ EVERY git-recovered stamp is a candidate, not only the missing ones.
+    # A record already present in a TERSER wording must still be able to lose
+    # to the richer version from git — otherwise dedupe cannot pick the fuller
+    # text, because the fuller text was never in the running. That is a silent
+    # information loss inside the tool built to prevent one.
+    for d, txt in found.items():
         t = txt.lstrip("-* ").strip()
         t = re.sub(r"^_Last updated ", "_Prior: ", t)
         rows.append((d, "- " + t))
 
+    # ⛔ DEDUPE, keeping the RICHEST text. Splitting a blob can produce a stamp
+    # that already exists as its own row in a slightly different wording — the
+    # same moment recorded once as `_Prior: <date> · transcript: X_` and once as
+    # `_Prior: <date> by an AI session · transcript: X_`. Appending both is how
+    # a repair becomes a duplication.
+    #
+    # ✅ Measured 2026-08-21: the first restore introduced **57 duplicate rows**
+    # across four fran-dash history files before this existed.
+    #
+    # ⚠️ The key is (date, transcript) — one session, one moment, so any two rows
+    # sharing it are the same record. The LONGEST text wins, because the loss
+    # this file exists to prevent is of INFORMATION, not of lines: if one copy
+    # carries a `— what changed` clause and the other does not, keep the one
+    # that does. Ties keep whichever was seen first, which is stable.
+    best = {}
+    for d, text in rows:
+        m = re.search(r"transcript:\s*`([^`]+)`", text)
+        k = (d, m.group(1) if m else text)
+        if k not in best or len(text) > len(best[k][1]):
+            best[k] = (d, text)
+    rows = list(best.values())
+
     rows.sort(key=lambda r: r[0], reverse=True)   # newest first, as the file states
-    hist.write_text(head.rstrip("\n") + "\n\n" + "\n".join(t for _, t in rows) + "\n",
-                    encoding="utf-8")
-    return sorted(missing), None
+    new = head.rstrip("\n") + "\n\n" + "\n".join(t for _, t in rows) + "\n"
+    if tail.strip():
+        new += "\n" + tail.lstrip("\n")
+
+    # ★ REFUSE TO SHRINK. The function already promised never to lose a stamp;
+    # that promise was scoped to stamps, so it passed while link definitions,
+    # headings and prose went out the door. This widens it to EVERY line: the
+    # new content must be a line-superset of the old, or nothing is written.
+    # ⛔ Set semantics -- reordering and duplicate-collapsing are fine, genuine
+    # disappearance is not. [DEC-052]: a history file may grow without limit;
+    # it may never lose an entry.
+    if hist.exists():
+        before_set = {l.strip() for l in body.split("\n") if l.strip()}
+        after_set = {l.strip() for l in new.split("\n") if l.strip()}
+        # ⚠️ The invariant is "never lose an ENTRY", not "never lose a LINE"
+        # ([DEC-052]). Splitting a blob legitimately removes the blob line and
+        # replaces it with one line per stamp it held; a literal line-superset
+        # check calls that data loss and kills the split feature outright
+        # (caught by the negative test, 2026-08-24). So a removed line is
+        # forgiven only when EVERY stamp it carried is still present by
+        # timestamp. ⛔ A line carrying no stamp at all -- a link definition, a
+        # heading, a sentence of prose -- can never be forgiven this way, which
+        # is exactly the class that went missing.
+        after_stamps = {m.group(1).strip()
+                        for m in AUDIT_DATE_RE.finditer(new)}
+        lost_lines = []
+        for l in sorted(before_set - after_set):
+            carried = {m.group(1).strip() for m in AUDIT_DATE_RE.finditer(l)}
+            if carried and carried <= after_stamps:
+                continue      # every stamp on this line survives elsewhere
+            lost_lines.append(l)
+        if lost_lines:
+            shown = "; ".join(l[:90] for l in lost_lines[:3])
+            more = f" … and {len(lost_lines) - 3} more" if len(lost_lines) > 3 else ""
+            raise SystemExit(
+                f"✗ {hist}: REFUSING TO WRITE — the rewrite would remove "
+                f"{len(lost_lines)} line(s) that are in the file now: {shown}{more}. "
+                f"A history file is append-only ([DEC-052]). This is a bug in "
+                f"stamp-doc.py, not something for you to work around.")
+
+    lines_before = len([l for l in body.split("\n") if l.strip()]) if hist.exists() else 0
+    hist.write_text(new, encoding="utf-8")
+    did.update(wrote=True, lines_before=lines_before,
+               lines_after=len([l for l in new.split("\n") if l.strip()]))
+    return sorted(missing), None, did
 
 
 def main():
@@ -463,16 +616,33 @@ def main():
     original = args.doc.read_text(encoding="utf-8")
 
     if args.restore:
-        missing, why = restore_history(args.doc, apply=not args.dry_run)
+        missing, why, did = restore_history(args.doc, apply=not args.dry_run)
         if why:
             print(f"⚠ {args.doc}: cannot restore — {why}")
             sys.exit(2)
-        if not missing:
-            print(f"✓ {args.doc}: nothing to restore")
-        else:
+        # ⛔ NEVER print a bare ✓ for a run that wrote. Three distinct outcomes,
+        # and conflating the middle one with the first is what hid the 2026-08-21
+        # deletion: no stamp was missing, so this said "nothing to restore" while
+        # the blob-split rewrite silently dropped 338 lines across six files.
+        # ★ The report must describe the WRITE, not just the stamp recovery.
+        wrote = bool(did and did.get("wrote"))
+        if missing:
             verb = "would restore" if args.dry_run else "restored"
             print(f"✓ {args.doc}: {verb} {len(missing)} stamp(s) — "
                   f"{missing[0]} … {missing[-1]}")
+        elif wrote:
+            print(f"✓ {args.doc}: no stamp was missing, but the history file WAS "
+                  f"REWRITTEN — split {did['blobs_split']} blob line(s); "
+                  f"{did['lines_before']} → {did['lines_after']} non-blank lines")
+        else:
+            print(f"✓ {args.doc}: nothing to restore, and nothing was written")
+        if wrote and did["lines_after"] < did["lines_before"]:
+            # Defence in depth: restore_history refuses to shrink, so reaching
+            # here means that guard was bypassed or has regressed. Say so loudly
+            # rather than reporting a clean result.
+            print(f"⚠ {args.doc}: the file got SHORTER "
+                  f"({did['lines_before']} → {did['lines_after']}) — inspect it "
+                  f"before committing; `git diff -- {args.doc.parent}/history/`")
         sys.exit(0)
 
     if args.check:
@@ -504,8 +674,9 @@ def main():
     if new_stamp:
         new_stamp = _close_current(new_stamp.strip())
         if not CURRENT_RE.match(new_stamp):
-            sys.exit("error: --stamp must start `_Last updated YYYY-MM-DD HH:MM TZ ` "
-                     "(or the bold `**Last updated:** ...` variant)")
+            sys.exit("error: --stamp must start `_Last updated YYYY-MM-DD HH:MM TZ `"
+                     " — the bold `**Last updated:**` variant is retired; the "
+                     "one-line snapshot is now `**Snapshot:** ...` and is not a stamp")
     elif not args.convert_only:
         sys.exit("error: pass --stamp/--stamp-file, or --convert-only")
 

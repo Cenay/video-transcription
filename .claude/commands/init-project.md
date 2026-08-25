@@ -217,7 +217,7 @@ This file provides guidance to Claude Code when working in this repository.
 ```markdown
 # Next Steps — {PROJECT_NAME}
 
-**Last updated:** {TODAY'S DATE + TIME}
+**Snapshot:** {TODAY'S DATE + TIME}
 
 > Start every session here. This file answers "what do I pick up right now?" —
 > details live in `CURRENT_STATUS.md`, decisions in `DECISIONS.md`.
@@ -264,7 +264,7 @@ This file provides guidance to Claude Code when working in this repository.
 ```markdown
 # Decisions — {PROJECT_NAME}
 
-**Last updated:** {TODAY'S DATE + TIME}
+**Snapshot:** {TODAY'S DATE + TIME}
 
 > The decision ledger. When any other doc disagrees with this file, **this file wins.**
 > New decisions get appended here, dated. Record the *why*, not just the *what* — a

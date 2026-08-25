@@ -73,7 +73,7 @@ Present a dense, actionable briefing. No fluff. Lead with the freshness warning 
 
 ---
 
-**{PROJECT_NAME}** | Last checkpoint: {copy the `**Last updated:**` line's stamp from CURRENT_STATUS.md verbatim — the full `YYYY-MM-DD HH:MM TZ`, not just the date}
+**{PROJECT_NAME}** | Last checkpoint: {copy the `**Snapshot:**` line's stamp from CURRENT_STATUS.md verbatim (older repos still label it `**Last updated:**` — accept either; see the note below) — the full `YYYY-MM-DD HH:MM TZ`, not just the date}
 
 **⏳ Waiting on your review:** {From step 1b — `#<number> <title> (@<author>)`, one line each. **Omit this line entirely when the queue is empty.**}
 
@@ -101,7 +101,7 @@ Do NOT summarize the entire CLAUDE.md. Do NOT explain the tech stack unless aske
 
 ## Why the "Last checkpoint" stamp can look old — and why that is correct
 
-`**Last updated:**` in `CURRENT_STATUS.md` is written by the doc set's **single writer**, during their session save. `/ship` and `/wrap-up` deliberately do not touch it. So after a stretch of commit-and-push work, the stamp will trail the newest commit — sometimes by days.
+`**Snapshot:**` in `CURRENT_STATUS.md` (labelled `**Last updated:**` in repos not yet migrated) is written by the doc set's **single writer**, during their session save. `/ship` and `/wrap-up` deliberately do not touch it. So after a stretch of commit-and-push work, the stamp will trail the newest commit — sometimes by days.
 
 **That is the intended semantics, not a bug.** The stamp answers "when did the writer last record where things stand?", not "when was this repo last touched." Report it verbatim and don't editorialize. If the gap is large and looks material, the honest move is one line noting the stamp is older than the recent commits — never to guess at a newer state or to write the header yourself.
 
