@@ -104,7 +104,24 @@ def main():
 
     targets = staged_files(root) if use_staged else named
     if not targets:
-        print(f"✓ check-append-only: no {HISTORY_DIR} files to check")
+        # ⛔ THREE DIFFERENT SITUATIONS, AND THEY MUST NOT SHARE A MESSAGE.
+        # This printed "no docs/history/ files to check" for all of them, so a
+        # run that checked NOTHING AT ALL -- because no target was given --
+        # looked identical to a clean run. Measured 2026-08-25: that message
+        # was misread twice in one session, once by the author of this comment,
+        # who concluded the guard "degrades gracefully" from a no-op invocation.
+        # ★ A checker must say what it did NOT check.
+        if not use_staged:
+            print("⚠ check-append-only: no files named and --staged not given "
+                  "— CHECK DID NOT RUN. Pass --staged (what the hook does), "
+                  "or name files to check.")
+            return 0
+        if not (root / HISTORY_DIR).is_dir():
+            print(f"✓ check-append-only: this repo has no {HISTORY_DIR} — "
+                  f"nothing for this guard to protect")
+            return 0
+        print(f"✓ check-append-only: nothing staged under {HISTORY_DIR} "
+              f"— no history file is being changed by this commit")
         return 0
 
     override = os.environ.get(OVERRIDE) == "1"
