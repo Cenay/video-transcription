@@ -186,6 +186,10 @@ def rel_href(from_path, docs_dir, target_relpath, slug):
     return f"{rel}#{slug}"
 
 
+# Counts existing link definitions, for the shrink guard in rewrite_doc.
+DEFN_LINE_RE = re.compile(r"^\[[^\]]+\]:\s*\S+", re.M)
+
+
 def rewrite_doc(abspath, docs_dir, id_map, dry, self_relpath=None):
     """Bracket resolvable IDs and regenerate the definition block.
 
@@ -360,6 +364,28 @@ def rewrite_doc(abspath, docs_dir, id_map, dry, self_relpath=None):
     if not used and not had_block:
         return False, 0
 
+    # ⛔ GUARD 2 — REFUSE TO SHRINK A MANAGED BLOCK.
+    #
+    # The general form of Guard 1, and the one that catches causes not yet
+    # invented: whatever the reason, a regenerated block holding FEWER
+    # definitions than the one it replaces is destroying references that a
+    # previous run resolved. That is a defect until a human says otherwise.
+    # Same shape as the append-only guard on docs/history/ ([DEC-260]).
+    #
+    # ALLOW_LINK_BLOCK_SHRINK=1 is the loud, deliberate override — correct when
+    # IDs have genuinely been removed from a doc's prose.
+    n_before = len(DEFN_LINE_RE.findall(before))
+    n_after = len(DEFN_LINE_RE.findall(text))
+    if n_after < n_before and not os.environ.get("ALLOW_LINK_BLOCK_SHRINK"):
+        print(
+            f"  ⛔ REFUSED {os.path.relpath(abspath, docs_dir)}: managed block would "
+            f"shrink {n_before} → {n_after} definitions. Nothing written.\n"
+            f"     If the IDs really were removed from the prose, re-run with "
+            f"ALLOW_LINK_BLOCK_SHRINK=1.",
+            file=sys.stderr,
+        )
+        return False, -1
+
     changed = text != before
     if changed and not dry:
         with open(abspath, "w", encoding="utf-8") as fh:
@@ -425,6 +451,33 @@ def main():
     frozen_paths = {p for p, rel in relpaths.items() if is_frozen(rel)}
     target_files = {p: relpaths[p] for p, rel in relpaths.items() if is_target(rel)}
     id_map = build_id_map(docs_dir, target_files)
+
+    # ⛔ GUARD 1 — AN EMPTY MAP IS A MISAIMED RUN, NOT AN EMPTY LEDGER.
+    #
+    # This script regenerates each doc's managed link block FROM the map. With an
+    # empty map every block regenerates to nothing, so a run that cannot see the
+    # ledger deletes every link definition in the tree it was pointed at.
+    #
+    # ✅ Reproduced 2026-08-25 on a throwaway copy of fran-dash/docs:
+    #   `link-doc-refs.py docs/history` -> "ids resolvable: 0 ... across 0 ledger
+    #   file(s)", then "linked: 12 narrative doc(s)" -- the word LINKED over an
+    #   operation that removed every link. DECISIONS-stamp-history.md went
+    #   173 -> 72 lines and 98 link definitions -> 0. Twelve of thirteen files
+    #   damaged, exit 0, no warning.
+    #
+    # ★ The tool already KNEW: it printed `0` and carried on. Treating "I found
+    #   nothing" as "there is nothing" is the same defect that made
+    #   stamp-doc.py --restore print "nothing to restore" while deleting 367
+    #   lines. Finding nothing is a reason to STOP, not a licence to write.
+    if not id_map:
+        sys.exit(
+            f"error: no DEC/G/M/D headings found under {docs_dir!r} — refusing to run.\n"
+            f"       Every managed link block would regenerate to EMPTY, deleting\n"
+            f"       every link definition in that tree.\n"
+            f"       Most likely you aimed this at a SUBDIRECTORY: the ledgers\n"
+            f"       (DECISIONS.md and friends) live in the docs root, and cannot be\n"
+            f"       seen from inside docs/history/. Point it at the docs root."
+        )
 
     changed_docs = []
     for doc in all_md:
