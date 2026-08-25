@@ -274,6 +274,29 @@ def merge_history(existing, rolled, doc_name):
     """
     if not rolled:
         return existing
+
+    # ⛔ SUPERSET MODEL ([DEC-053]): the history file may already hold a stamp
+    # that is still sitting in the doc's fold — `--restore` writes EVERY stamp
+    # git has ever seen, fold included, and is right to. Prepending such a
+    # prior again duplicates it INSIDE history, which is a real defect (the
+    # cross-surface copy is not).
+    #
+    # ⚠️ Keyed by TIMESTAMP, not by exact text, and deliberately: `restore_history`
+    # dedupes on (date, transcript) keeping the RICHEST wording, so history's copy
+    # is often longer than the fold's. An exact-text test would miss it and
+    # duplicate. Timestamp is the same key `restore_history` and `audit_history`
+    # already use, so all three agree on what "already recorded" means.
+    #
+    # ★ This is what makes roll-down IDEMPOTENT: rolling a prior that history
+    # already carries is a no-op, not an append.
+    if existing:
+        have = {m.group(1).strip() for m in AUDIT_DATE_RE.finditer(existing)}
+        rolled = [p for p in rolled
+                  if not (AUDIT_DATE_RE.search(p)
+                          and AUDIT_DATE_RE.search(p).group(1).strip() in have)]
+        if not rolled:
+            return existing
+
     block = "\n".join(f"- {p}" for p in rolled)
     if existing is None:
         return history_header(doc_name, "") + block + "\n"
@@ -377,6 +400,17 @@ def lint_shadow_chain(text):
 # carried and fails if any of them is absent from the doc plus its history file.
 AUDIT_DATE_RE = re.compile(
     r"_(?:Last updated|Prior:)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[A-Z]{2,5})")
+
+
+def stamp_dates(text):
+    """The timestamps of every STAMP in `text` — the record's identity key.
+
+    ★ Note what this is not: a date scan. The `_Last updated`/`_Prior:` prefix is
+    part of the pattern, so a timestamp sitting in ordinary prose is invisible
+    here — `fran-dash/docs/CURRENT_STATUS.md` opens with a `**Snapshot:**
+    2026-08-25 02:02 MST` line that must never read as a stamp ([DEC-265]).
+    """
+    return {m.group(1).strip() for m in AUDIT_DATE_RE.finditer(text or "")}
 
 
 def _git(args, cwd):
@@ -776,12 +810,56 @@ def main():
 
     # Verification (spec section 4): every prior that existed before this run must
     # appear exactly once across {parent, history}. Move, never delete.
+    # ⛔ SUPERSET, ruled by Cenay 2026-08-25 ([DEC-053]). This check used to demand
+    # each prior appear EXACTLY ONCE across {doc, history} — a DISJOINT model, where
+    # a stamp lives in the fold or in history but never both. `restore_history()`
+    # has always assumed the opposite (it writes every stamp git has ever seen,
+    # fold included). Two functions, two answers, one file: after a `--restore`,
+    # `--convert-only` refused every folded prior as a duplicate and reported
+    # "0 prior(s) would be lost, 3 duplicated" — literally true, and unreadable as
+    # the blocker it was. The doc could then never be reshaped again, which is how
+    # a stale fold pointer became unfixable in /mnt/k/Code/System.
+    #
+    # ★ The two failures worth catching survive, and one gets STRONGER:
+    #   1. LOSS — a prior present before this run is now nowhere. Unchanged.
+    #   2. DURABILITY — a prior being rolled OUT of the fold must land in history.
+    #      New. The old check could not state this: "exactly once somewhere" is
+    #      satisfied by a prior that stayed in the doc and never reached history.
+    #   3. DUPLICATION WITHIN ONE SURFACE — still a bug. Only the CROSS-surface
+    #      copy is legalized, because that is the one the superset model creates.
+    # ⚠️ Presence is tested VERBATIM FIRST, then by timestamp on a stamp-shaped
+    # line. The fallback is required, not a convenience: `--restore` dedupes on
+    # (date, transcript) keeping the RICHEST wording, so history routinely holds
+    # a fuller text of the same record than the fold does. An exact-text-only
+    # test calls that a loss and refuses — trading one wedge for another.
+    # ⛔ The fallback goes through `stamp_dates`, which requires the
+    # `_Last updated`/`_Prior:` prefix — a timestamp in ordinary prose is not a
+    # stamp and must never be read as one ([DEC-265]).
+    # ★ This keys PRESENCE on the record, never on the text. Text preservation is
+    # a separate promise, kept by restore_history's refuse-to-shrink and by
+    # check-append-only.py — the guards actually built for it.
+    def recorded(prior, text):
+        if not text:
+            return False
+        if prior in text:
+            return True
+        m = AUDIT_DATE_RE.search(prior)
+        return bool(m) and m.group(1).strip() in stamp_dates(text)
+
     haystack = new_doc + (new_hist or "")
-    missing = [p for p in old_priors if p not in haystack]
-    dupes = [p for p in old_priors if haystack.count(p) != 1]
-    if missing or dupes:
-        sys.exit(f"error: refusing to write — {len(missing)} prior(s) would be lost, "
-                 f"{len(dupes)} duplicated. No files changed.")
+    missing = [p for p in old_priors if not recorded(p, haystack)]
+    not_durable = [p for p in roll if not recorded(p, new_hist or "")]
+    # ⛔ Duplication stays an EXACT-TEXT count, deliberately. It is the one term
+    # here that can only ever fire on a real defect, and a timestamp count would
+    # inherit the prose-collision above and start refusing healthy docs.
+    dupes = [p for p in old_priors
+             if new_doc.count(p) > 1 or (new_hist or "").count(p) > 1]
+    if missing or not_durable or dupes:
+        sys.exit(
+            f"error: refusing to write — {len(missing)} prior(s) would be lost, "
+            f"{len(not_durable)} rolled out of the fold without reaching "
+            f"{hist_path}, {len(dupes)} duplicated within a single file. "
+            f"No files changed.")
 
     if args.dry_run:
         print(f"--- {args.doc} (current + {len(keep)} folded) ---")
