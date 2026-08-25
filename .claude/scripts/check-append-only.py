@@ -36,6 +36,8 @@ renderings of one record genuinely needs to remove a line. Making that impossibl
 would push the work outside the guard entirely, which is worse. So it is possible,
 never accidental, and it prints what it let through.
 """
+import collections
+import re
 import os
 import subprocess
 import sys
@@ -73,6 +75,15 @@ def content_staged(path, root):
     return git(["show", f":{path}"], cwd=root)
 
 
+def _words(line):
+    """Word multiset of a line, for the content comparison in check().
+
+    Punctuation and markup are ignored on purpose: `DEC-132` and `[DEC-132]`
+    must compare equal, because bracketing an id adds no words and removes none.
+    """
+    return collections.Counter(re.findall(r"[A-Za-z0-9]+", line))
+
+
 def check(path, root, staged):
     """Returns (ok, lost_lines, note). note is set when the check could NOT run."""
     before = content_head(path, root)
@@ -87,7 +98,35 @@ def check(path, root, staged):
         if not p.exists():
             return False, [], None  # deletion of a history file is always a failure
         after = p.read_text(encoding="utf-8")
-    lost = sorted(lines_of(before) - lines_of(after))
+    gone = lines_of(before) - lines_of(after)
+    if not gone:
+        return True, [], None
+
+    # ⛔ A LINE MAY BE ENRICHED IN PLACE. CONTENT MAY NEVER LEAVE.
+    #
+    # The invariant was "no line leaves", compared as line SETS. That is too
+    # strict, and it collided with a tool doing its job: link-doc-refs.py
+    # brackets a bare id in prose (`DEC-132` -> `[DEC-132]`), which rewrites the
+    # line. To a set comparison that is one line leaving and one arriving, so
+    # every legitimate linking run looked like a violation.
+    #
+    # ✅ Measured 2026-08-25: three such lines across two history files, and a
+    # word-level check showed ZERO words lost -- the only change was the
+    # brackets. Ruled by Cenay: compare CONTENT.
+    #
+    # ★ A removed line is forgiven only if some SINGLE surviving line contains
+    # every word of it. Not "the words are somewhere in the file" -- that would
+    # let a line be shredded across others and call it survival.
+    #
+    # ⚠️ What this deliberately still catches: a line whose text was shortened,
+    # reworded, or dropped outright. Losing one word is losing content.
+    arrived = lines_of(after) - lines_of(before)
+    arrived_words = [(a, _words(a)) for a in arrived]
+    lost = []
+    for g in sorted(gone):
+        gw = _words(g)
+        if not any(not (gw - aw) for _, aw in arrived_words):
+            lost.append(g)
     return (not lost), lost, None
 
 

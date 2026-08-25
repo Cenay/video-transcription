@@ -125,6 +125,42 @@ check("history exists but nothing staged says THAT instead",
 check("the three messages are all different",
       len({out.strip(), out2.strip(), out3.strip()}) == 3)
 
+print("3b. ENRICHING a line in place is allowed — content, not lines")
+# link-doc-refs.py brackets a bare id (`DEC-132` -> `[DEC-132]`), which rewrites
+# the line. Under the old line-set comparison every legitimate linking run read
+# as a violation. Ruled 2026-08-25: compare content.
+d = repo()
+h = d/"docs"/"history"/"X-stamp-history.md"
+h.write_text(h.read_text(encoding="utf-8").replace(
+    "· transcript: `aaaa`_", "· transcript: `aaaa` — see [DEC-132]_"), encoding="utf-8")
+sh(d, "git", "add", "-A")
+r = run(d)
+check("exits zero", r.returncode == 0, f"exit={r.returncode} {(r.stdout+r.stderr)[:110]}")
+
+print("3c. but SHORTENING a line still blocks — losing one word is losing content")
+d = repo()
+h = d/"docs"/"history"/"X-stamp-history.md"
+h.write_text(h.read_text(encoding="utf-8").replace(
+    "- _Prior: 2026-08-01 10:00 MST · transcript: `aaaa`_",
+    "- _Prior: 2026-08-01 10:00 MST_"), encoding="utf-8")
+sh(d, "git", "add", "-A")
+r = run(d)
+check("exits non-zero", r.returncode != 0, f"exit={r.returncode}")
+check("names the lost text", "aaaa" in (r.stdout + r.stderr))
+
+print("3d. a line SHREDDED across several others is NOT survival")
+# The words all still exist in the file, just not together in any one line.
+# A weaker check ('are these words somewhere?') would call that fine.
+d = repo()
+h = d/"docs"/"history"/"X-stamp-history.md"
+t = h.read_text(encoding="utf-8").replace(
+    "- _Prior: 2026-08-01 10:00 MST · transcript: `aaaa`_",
+    "- _Prior: 2026-08-01 10:00 MST_\n- transcript: `aaaa`")
+h.write_text(t, encoding="utf-8")
+sh(d, "git", "add", "-A")
+r = run(d)
+check("exits non-zero", r.returncode != 0, f"exit={r.returncode}")
+
 print("7. an unstaged removal is NOT the guard's business")
 d = repo()
 h = d/"docs"/"history"/"X-stamp-history.md"
