@@ -18,5 +18,5 @@ and record decisions in your PR body instead — they are harvested from there.
 detects it, refuses to overwrite it, and asks for it to be back-ported. That protects the
 work, but it also stalls the sync — so make the change in the toolkit in the first place.
 
-Managed items: skills = wrap-up next-step; commands = init-project resume ship bug file-bug build-timer-note; guides = doc-style-reference.md bug-report-style.md; scripts = link-doc-refs.py reflow-md.py stamp-doc.py ledger_contract.py write-entry.py ledger-lint.py; github = bug_report.yml config.yml.
-Last synced: 2026-08-21 13:59 MST
+Managed items: skills = wrap-up next-step; commands = init-project resume ship bug file-bug build-timer-note; guides = doc-style-reference.md bug-report-style.md; scripts = link-doc-refs.py reflow-md.py stamp-doc.py ledger_contract.py write-entry.py ledger-lint.py check-append-only.py sweep-archive.py check-status-doc-updated.sh doc_root.py; github = bug_report.yml config.yml.
+Last synced: 2026-08-25 16:34 MST
