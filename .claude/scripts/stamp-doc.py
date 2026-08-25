@@ -142,6 +142,23 @@ def parse_doc(text):
     cands = [i for i, l in enumerate(lines) if CURRENT_RE.match(l)]
     if not cands:
         raise NoStampError("no `_Last updated YYYY-MM-DD HH:MM TZ ...` line found")
+    # ⛔ THE DOC STAMP IS THE ONE IN THE HEADER -- above the first `##` section.
+    #
+    # Some repos stamp each SECTION as well as the document: LSP/Staff_Form's
+    # CURRENT_STATUS.md carries a header stamp plus one per `## Session record`
+    # block, five in all, and every one of them is a real record. A blanket
+    # "more than one candidate is an error" refused that whole convention.
+    #
+    # ★ Scoping to the header keeps the guard that matters -- the orphan left
+    # behind by the old tiebreak sits in the header region, so two candidates
+    # THERE is still a hard refusal -- while leaving per-section stamps alone.
+    # This is a STRUCTURAL rule (position relative to the first `##`), not a
+    # sniff at the prose, which is what made the old `transcript:` tiebreak
+    # unsound.
+    first_section = next((i for i, l in enumerate(lines) if l.startswith("## ")), len(lines))
+    header_cands = [i for i in cands if i < first_section]
+    if header_cands:
+        cands = header_cands
     if len(cands) > 1:
         where = ", ".join(f"line {i + 1}" for i in cands)
         raise NoStampError(

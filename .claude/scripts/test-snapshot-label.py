@@ -71,6 +71,32 @@ check("the `_Prior status:` line is untouched",
 check("it did not become a stamp row",
       not re.search(r"^- _Prior: 2026-07-20", out, re.M))
 
+print("4b. per-SECTION stamps are a legitimate convention, not an error")
+# LSP/Staff_Form's CURRENT_STATUS.md carries a header stamp plus one per
+# `## Session record` block -- five in all, every one a real record. A blanket
+# "more than one `_Last updated` is an error" refused that whole repo.
+body = ("# T\n\n" + STAMP_A + "\n\nintro\n\n"
+        "## Session record — 2026-08-04\n"
+        "_Last updated 2026-08-04 00:40 MST by an AI session · transcript: `cccc`_\n\n"
+        "notes\n\n"
+        "## Session record — 2026-08-03\n"
+        "_Last updated 2026-08-03 12:59 MST by an AI session · transcript: `dddd`_\n")
+r, f = run(body, "--stamp", NEW)
+out = f.read_text(encoding="utf-8")
+check("the write succeeds", r.returncode == 0, f"exit={r.returncode} {(r.stderr or '')[:90]}")
+check("the HEADER stamp is the one folded",
+      re.search(r"^- _Prior: 2026-08-25 08:00", out, re.M) is not None)
+check("per-section stamps are untouched",
+      "2026-08-04 00:40 MST" in out and "2026-08-03 12:59 MST" in out)
+check("they did NOT become prior rows",
+      not re.search(r"^- _Prior: 2026-08-0[34]", out, re.M))
+
+print("4c. but TWO header stamps is still a hard refusal (the orphan case)")
+body = ("# T\n\n" + NEW + "\n\nmiddle\n\n" + STAMP_A + "\n\n## A section\n\ntext\n")
+r, _ = run(body, "--check")
+check("--check still exits non-zero", r.returncode != 0, f"exit={r.returncode}")
+check("still refuses rather than guesses", "Refusing to guess" in (r.stdout + r.stderr))
+
 print("5. control — a well-formed doc still passes and still stamps")
 body = ("# T\n\n**Snapshot:** 2026-08-25 09:00 MST (session 99)\n\n" + STAMP_A + "\n")
 r, f = run(body, "--stamp", NEW)
