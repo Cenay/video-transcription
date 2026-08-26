@@ -744,6 +744,40 @@ def main():
         # weeks while sixteen stamps went out of the file.
         lost, checked, ever = audit_history(args.doc)
         problems += lost
+
+        # ⛔ AN UNSTAMPED DOC IS NOT A BROKEN DOC ([DEC-054], Cenay 2026-08-25).
+        # This check hunts a CORRUPTED or LOST chain — the 5,556-character blob,
+        # the 130 missing stamps. A doc that never had a chain has none to break.
+        #
+        # ✅ Measured before the rule was written: ported verbatim into the fleet's
+        # pre-commit hooks, this check would have blocked commits touching **37
+        # tracked docs across 6 repos** — README.md, ARCHITECTURE.md, CHANGELOG.md,
+        # QUICK_START.md, the brand docs. Every one of the 37 failed with this same
+        # message, and NOT ONE was a corruption or a loss. The selector
+        # `^docs/[A-Z_-]+\.md$` names fran-dash's curated stamped set by coincidence
+        # of naming; elsewhere it sweeps up ordinary documentation.
+        # ★ A guard that fires on healthy work is how you learn to bypass guards.
+        #
+        # ⛔ THE HOLE THIS MUST NOT OPEN: forgiving a stamp that was just DELETED,
+        # the exact loss this tool exists to catch.
+        #
+        # ★ WHAT ACTUALLY CLOSES IT IS `lost`, NOT `not ever`. The audit derives
+        # `ever` from git and `now` from the doc plus its history file, so ANY
+        # committed stamp that disappears from both lands in `lost` — which is not
+        # the "no `_Last updated`" message and is never filtered here. The check
+        # stays fatal on a deletion whatever this condition says.
+        #
+        # ⚠️ So `not ever` is BELT-AND-BRACES, and saying otherwise would be a
+        # false rationale sitting in the file that future readers trust. An earlier
+        # version of this comment claimed it was load-bearing; `--prove` disproved
+        # that by mutating it away and watching every deletion case stay caught.
+        # It is kept because it states the intent in the condition itself and would
+        # hold if the audit ever regressed — not because anything here needs it.
+        # `test-unstamped-doc.py --prove` reports it as NOT COVERED, deliberately.
+        never_stamped = not ever and not AUDIT_DATE_RE.search(original)
+        if never_stamped:
+            problems = [p for p in problems if not p.startswith("no `_Last updated")]
+
         for p in problems:
             print(f"✗ {args.doc}: {p}")
         # ⚠️ A checker must NAME WHAT IT DID NOT CHECK. Silence has to mean
@@ -756,7 +790,15 @@ def main():
             print(f"✓ {args.doc}: history audit — all {len(ever)} stamp(s) ever "
                   f"committed are still present")
         if not problems:
-            print(f"✓ {args.doc}: stamp block is well-formed")
+            # ⚠️ NAME WHAT WAS NOT CHECKED. "well-formed" would be a lie about a
+            # doc with no stamp block at all, and the quiet kind — it reads as a
+            # pass on something that was never looked at.
+            if never_stamped:
+                print(f"✓ {args.doc}: NOT STAMPED and never has been — nothing to "
+                      f"check. This is not an error; stamp it with --stamp-file if "
+                      f"it should carry traceability.")
+            else:
+                print(f"✓ {args.doc}: stamp block is well-formed")
         sys.exit(1 if problems else 0)
 
     new_stamp = args.stamp

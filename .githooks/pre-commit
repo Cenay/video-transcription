@@ -119,4 +119,52 @@ if [ -n "$(git diff --cached --name-only --diff-filter=ACM | grep '^docs/history
   fi
 fi
 
+# ── Check 4: stamp-block structure on the shared docs ─────────────────────────
+# `stamp-doc.py` writes a bounded stamp chain (current + 3 folded + roll-down),
+# and that bound is the whole reason it exists: one hand-prepended stamp line in
+# a DECISIONS.md once reached 5,556 characters holding 11 stamps, one of which
+# had silently lost its delimiter and was invisible to any reader.
+#
+# ⛔ T11 — A HISTORY-ONLY COMMIT USED TO RUN NO STAMP AUDIT AT ALL. The selector
+# was `^docs/[A-Z_-]+\.md$`, which cannot match `docs/history/X-stamp-history.md`
+# -- the `/` fails the character class. So the one place stamps actually go
+# missing was the one place this check never looked. Measured during the
+# 2026-08-21 incident: 367 lines left 13 history files across three repos and
+# every commit passed.
+#
+# The fix maps a staged history file back to its PARENT doc, because
+# `stamp-doc.py --check` audits the parent and its history file together.
+# Archive files (`*-archive.md`) deliberately do not map: they hold no stamp
+# chain. Check 4b guards those.
+for doc in $(git diff --cached --name-only --diff-filter=ACM \
+             | sed -E 's|^docs/history/([A-Z_-]+)-stamp-history\.md$|docs/\1.md|' \
+             | grep -E '^docs/[A-Z_-]+\.md$' | sort -u); do
+  [ -f "$doc" ] || continue
+  # Repo-local copy first — an absolute toolkit path is one machine only and
+  # would silently skip (or crash) for a teammate. `scripts/` is listed because
+  # in the toolkit ITSELF the canonical copy lives there and there is no
+  # `.claude/scripts/` mirror; without it the toolkit resolves only via the
+  # absolute fallback, which is exactly the teammate-hostile path.
+  STAMP_DOC=''
+  for cand in '.claude/scripts/stamp-doc.py' 'scripts/stamp-doc.py' \
+              '/mnt/k/Code/claude-personal-toolkit/scripts/stamp-doc.py'; do
+    [ -f "$cand" ] && { STAMP_DOC="$cand"; break; }
+  done
+  # ⛔ Never fail open with a clean tick -- say the check did not run.
+  [ -n "$STAMP_DOC" ] || { echo -e "${YELLOW}⚠ stamp checker NOT FOUND — $doc was NOT checked${NC}"; continue; }
+  if ! stamp_out=$(python3 "$STAMP_DOC" "$doc" --check 2>&1); then
+    echo ""
+    echo -e "${RED}╔══════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║  STAMP BLOCK MALFORMED — COMMIT BLOCKED          ║${NC}"
+    echo -e "${RED}╚══════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo "$stamp_out" | sed 's/^/  /'
+    echo ""
+    echo -e "${YELLOW}Never hand-prepend a stamp. Write it to a file and let the tool place it:${NC}"
+    echo -e "  python3 $STAMP_DOC $doc --stamp-file /tmp/stamp.txt"
+    echo ""
+    exit 1
+  fi
+done
+
 exit 0
