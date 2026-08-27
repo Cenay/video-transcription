@@ -41,7 +41,17 @@ from collections import namedtuple
 # pattern, missed G77 the same way, counted 169 existing rows, and waved the
 # write through. One pattern, exported, used everywhere — that is the point of
 # this module, and duplicating it is how it fails.
-ID_PATTERN = r"(?:(?:DEC|BUG|SUSP|LES|ADR)-\d+|[GMD]-?\d+)"
+# ⚠️ The numeric tail REPEATS. `BUG-`/`SUSP-`/`LES-` records are numbered by
+# date — `BUG-2026-08-26-001` — not by a bare counter. A pattern of `-\d+`
+# matched `BUG-2026` and stopped; the remainder fell into the title group, and
+# normalize-ledger rebuilt the heading by joining id and title with a space,
+# rewriting all 17 entries of a real ledger as `BUG-2026 -08-26-001` while
+# printing `✓ content-preservation assertion passed`. `DEC-NNN` parsed fine,
+# which is exactly why nothing here exercised the date form for months.
+# The `[GMD]` families are deliberately NOT widened: those are predecessor-repo
+# records (`G77`, `M-043`, `D-049`) with no date form, and widening them would
+# only add over-match risk for no case that exists.
+ID_PATTERN = r"(?:(?:DEC|BUG|SUSP|LES|ADR)-\d+(?:-\d+)*|[GMD]-?\d+)"
 
 ENTRY_RE = re.compile(
     rf"^(?P<level>#{{2,4}})\s+\[?(?P<id>{ID_PATTERN})\]?\s*(?P<title>.*?)\s*$"
