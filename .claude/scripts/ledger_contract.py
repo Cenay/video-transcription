@@ -718,6 +718,36 @@ def check_dec_collisions(local_ledger, sibling_paths):
     return collisions, skips
 
 
+def repo_root_for(ledger, explicit=None):
+    """The repo a LEDGER belongs to — derived from the ledger's OWN path.
+
+    ⛔ Never default this to the cwd. `--repo-root` used to default to ".", so a
+    session standing in repo A and asking about repo B's ledger read A's
+    `.claude/ledger-siblings` and A's `docs/intake/`, then printed B's name
+    beside the answer. ✅ Measured 2026-08-27: `next-free` on trfaapi.com run
+    from the toolkit reported it `standalone` and returned DEC-246 — twenty
+    numbers fran-dash already owns — while the same command run inside the repo
+    returned DEC-267. `check-collisions` was worse: it exited 0 with "nothing to
+    collide with". ★ Both delivered a WRONG answer wearing a confident
+    provenance line, which is worse than a refusal.
+
+    This is the cross-repo working pattern, not an edge case: a fix or an entry
+    is routinely asked for in a repo the session is not standing in.
+    """
+    import os
+    if explicit is not None:
+        return explicit
+    d = os.path.dirname(os.path.abspath(ledger))
+    while True:
+        # A worktree/submodule carries `.git` as a FILE, so test existence.
+        if os.path.exists(os.path.join(d, ".git")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return "."          # no repo above it — cwd is the only answer left
+        d = parent
+
+
 def reserved_in_unapplied_intake(repo_root="."):
     """-> (reservations, scanned_count) where reservations is [(n, path)].
 
@@ -792,16 +822,19 @@ def _cli_next_free(argv):
     ap.add_argument("ledger", help="this repo's DECISIONS.md")
     ap.add_argument("--sibling", action="append", default=[],
                     help=f"sibling ledger path (repeatable). Default: read {SIBLING_CONFIG}")
-    ap.add_argument("--repo-root", default=".")
+    ap.add_argument("--repo-root", default=None,
+                    help="the repo the LEDGER belongs to "
+                         "(default: derived from the ledger path, never the cwd)")
     ap.add_argument("--count", type=int, default=1,
                     help="report a run of N consecutive free numbers")
     args = ap.parse_args(argv)
+    repo_root = repo_root_for(args.ledger, args.repo_root)
 
     if not os.path.exists(args.ledger):
         print(f"REFUSING: no ledger at {args.ledger}")
         return 2
 
-    siblings = args.sibling or load_siblings(args.repo_root)
+    siblings = args.sibling or load_siblings(repo_root)
 
     # A skip is NEVER a pass -- and for allocation it is worse than for
     # collision-checking. There, an unread sibling means "not checked"; here it
@@ -857,7 +890,7 @@ def _cli_next_free(argv):
               f"({len(run)} consecutive)")
     if standalone:
         print(f"  scanned: {args.ledger} ALONE — this ledger is declared "
-              f"`{STANDALONE}` in {SIBLING_CONFIG}; "
+              f"`{STANDALONE}` in {os.path.join(repo_root, SIBLING_CONFIG)}; "
               f"highest in use DEC-{max(used):03d} (registry stubs counted)")
         print("  NOT CHECKED: any other repo's ledger. That is correct only if "
               "the declaration is true — re-check it before trusting this "
@@ -867,7 +900,7 @@ def _cli_next_free(argv):
               f"highest in use DEC-{max(used):03d} (registry stubs counted)")
 
     # Name what was NOT checked, so silence cannot read as "nothing there".
-    reservations, scanned = reserved_in_unapplied_intake(args.repo_root)
+    reservations, scanned = reserved_in_unapplied_intake(repo_root)
     clashes = sorted({r for r, _p in reservations if r >= run[0]})
     if clashes:
         print("")
@@ -876,7 +909,7 @@ def _cli_next_free(argv):
         for c in clashes:
             for r, p in reservations:
                 if r == c:
-                    print(f"      DEC-{c:03d} <- {os.path.relpath(p, args.repo_root)}")
+                    print(f"      DEC-{c:03d} <- {os.path.relpath(p, repo_root)}")
                     break
         print("  These are in NO ledger yet, so the number above does not "
               "account for them. Read those notes before allocating.")
@@ -900,14 +933,17 @@ def _cli(argv):
     ap.add_argument("--sibling", action="append", default=[],
                     help="sibling ledger path (repeatable). Default: read "
                          f"{SIBLING_CONFIG}")
-    ap.add_argument("--repo-root", default=".")
+    ap.add_argument("--repo-root", default=None,
+                    help="the repo the LEDGER belongs to "
+                         "(default: derived from the ledger path, never the cwd)")
     args = ap.parse_args(argv)
+    repo_root = repo_root_for(args.ledger, args.repo_root)
 
     if not os.path.exists(args.ledger):
         print(f"skip: no ledger at {args.ledger}")
         return 0
 
-    siblings = args.sibling or load_siblings(args.repo_root)
+    siblings = args.sibling or load_siblings(repo_root)
     # STANDALONE is a STRING, and a string is iterable -- without this branch the
     # loop below treats it as ten one-character sibling paths and reports ten
     # skips. That is exactly what happened on 2026-08-19 when the sentinel was
@@ -915,7 +951,7 @@ def _cli(argv):
     # sibling(s) were skipped". A sentinel that shares a type with the normal
     # value has to be handled at EVERY consumer, not the one you were editing.
     if siblings == STANDALONE:
-        print(f"skip: this ledger is declared `{STANDALONE}` in {SIBLING_CONFIG} "
+        print(f"skip: this ledger is declared `{STANDALONE}` in {os.path.join(repo_root, SIBLING_CONFIG)} "
               f"— it shares its DEC- series with no one, so there is nothing to "
               f"collide with")
         print("      NOT CHECKED: any other repo's ledger, by design. Correct "
