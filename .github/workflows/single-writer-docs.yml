@@ -1,0 +1,99 @@
+name: single-writer-docs
+
+# Guards the documents that have exactly ONE writer.
+#
+# A pull request that changes any guarded file, opened by anyone else, fails
+# here — immediately, at PR time, with no human in the loop. That last part is
+# the point: the two developers are ~12 hours apart, so any rule shaped like
+# "wait for her approval" costs a full day. This fails in ~15 seconds and tells
+# the author exactly what to do instead.
+#
+# This does NOT replace CODEOWNERS + branch protection; it complements them.
+# CODEOWNERS says who owns the file. This says "don't wait for her, put it in
+# the PR body." Wire it as a REQUIRED status check or it advises nothing.
+#
+# Source of truth: claude-personal-toolkit/templates/github/workflows/.
+# Edit it there and re-deploy — not here.
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Deliberately NOT filtered with `paths:`. A required status check that never
+# runs never reports a conclusion, and GitHub leaves the PR blocked forever
+# waiting for a check that will not arrive. So: run on every PR, exit fast when
+# nothing matches. This is the single most common way this pattern is broken.
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  guarded-docs:
+    name: guarded-docs
+    runs-on: ubuntu-latest
+    env:
+      # The one writer. Flip this to a dummy value to test the FAILING path
+      # from the writer's own account — see the runbook in the toolkit.
+      SINGLE_WRITER: Cenay
+      # One path per line. Must match the repo's .github/CODEOWNERS.
+      GUARDED_PATHS: |
+        docs/DECISIONS.md
+        docs/CURRENT_STATUS.md
+        docs/NEXT_STEPS.md
+        docs/TODOS.md
+        docs/LESSONS_LEARNED.md
+      # Untrusted values go through env, never straight into the shell.
+      PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check for changes to guarded documents
+        run: |
+          set -euo pipefail
+
+          gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate -q '.[].filename' \
+            | sort -u > /tmp/changed.txt
+          printf '%s\n' "${GUARDED_PATHS}" | sed '/^[[:space:]]*$/d;s/[[:space:]]*$//' \
+            | sort -u > /tmp/guarded.txt
+
+          hits="$(grep -Fxf /tmp/guarded.txt /tmp/changed.txt || true)"
+
+          if [ -z "${hits}" ]; then
+            echo "::notice::No guarded documents touched by this PR."
+            exit 0
+          fi
+
+          echo "Guarded documents changed by this PR:"
+          printf '%s\n' "${hits}" | sed 's/^/  - /'
+
+          if [ "${PR_AUTHOR}" = "${SINGLE_WRITER}" ]; then
+            echo "::notice::Author @${PR_AUTHOR} is the single writer — allowed."
+            exit 0
+          fi
+
+          echo "::error::This PR changes documents reserved to @${SINGLE_WRITER}."
+          cat <<'EXPLAIN'
+
+          ────────────────────────────────────────────────────────────────
+          These documents have exactly one writer.
+
+          Nothing is wrong with your work — this file just isn't the place
+          to record it, and you should NOT wait for a review to get past
+          this. Do this instead:
+
+            1. Revert your changes to the file(s) listed above:
+                 git checkout origin/main -- <path>
+            2. Put what you wanted to record in THIS PR's description.
+               Decisions, status, gotchas, follow-ups — all of it.
+            3. Push. This check goes green and you can merge.
+
+          The single writer harvests PR bodies and folds them into the
+          documents. That way your context is captured without two people
+          editing the same files across a 12-hour time difference.
+          ────────────────────────────────────────────────────────────────
+
+          EXPLAIN
+          exit 1

@@ -1,0 +1,17 @@
+# Single-writer documents.
+#
+# These five files have exactly ONE writer (@Cenay). A teammate's decisions and
+# status are harvested from PR bodies instead of written here directly.
+# Rationale: plans/dev-handoff-workflow.md, and DEC-022/DEC-026 in the
+# claude-personal-toolkit ledger.
+#
+# This file only MAPS paths to reviewers — it blocks nothing on its own.
+# Branch protection on `main` ("Require review from Code Owners") is what
+# gives it teeth. Last matching pattern wins, so keep any broader docs/*
+# rule below these.
+
+docs/DECISIONS.md         @Cenay
+docs/CURRENT_STATUS.md    @Cenay
+docs/NEXT_STEPS.md        @Cenay
+docs/TODOS.md             @Cenay
+docs/LESSONS_LEARNED.md   @Cenay
