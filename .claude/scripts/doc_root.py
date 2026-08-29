@@ -157,12 +157,32 @@ def doc_root(repo, sites_root=SITES_ROOT):
     an absolute path would be wrong.
 
     Evidence first (see the module docstring), then the path convention.
+
+    ⛔ THE CONVENTION IS NOW `docs/` EVERYWHERE — ruled by Cenay 2026-08-29.
+    It used to default `_Sites` repos to `<cloaked>/docs`, which is what made
+    "where do the docs live" a two-answer question every tool had to branch on.
+    ✅ Measured that day: of 65 folders under _Sites, FIVE had docs at all —
+    three in `.cloaked/docs`, and all three were in directories that are not
+    git repos, so the ignore `.cloaked/` exists to provide was protecting
+    nothing. The two that ARE repos (trfaapi.com, sba) already used `docs/`.
+    The split was buying nothing where it was actually used, so the three were
+    moved up and the convention follows them.
+
+    ⚠️ `.cloaked/` ITSELF IS UNCHANGED and still serves its larger purpose —
+    backups, security material, client-supplied files, exports. Only the docs
+    folder came out of it.
+
+    ★ This stays BACKWARD COMPATIBLE, and that is the point of leaving
+    existing_doc_root untouched above: a repo that really does keep its doc set
+    in `<cloaked>/docs` still resolves there, because the EVIDENCE path ranks
+    it by doc-set markers and evidence outranks convention. What changed is
+    only the answer for a repo with no doc set yet — a new `_Sites` project now
+    gets `docs/` instead of being told to create a second location.
     """
     found = existing_doc_root(repo, sites_root)
     if found is not None:
         return found
-    name = cloaked_name(repo, sites_root)
-    return "docs" if name is None else f"{name}/docs"
+    return "docs"
 
 
 def desk_path(repo, sites_root=SITES_ROOT):
