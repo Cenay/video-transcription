@@ -78,6 +78,205 @@ LEGACY_VIOLATIONS = {(28, 29)}
 LEGACY_DUPLICATES = {13}
 
 
+# ── THE UNRESOLVED-ITEM GATE ────────────────────────────────────────────────────
+#
+# ⛔ RULED 2026-08-30 by Cenay: "Something should NOT roll when it carries an
+# unresolved item, ever."
+#
+# WHY THIS EXISTS. The [DEC-150] retention window is an AGE test -- "older than the
+# last ~2 days or 4 sessions". Age is a bad proxy for done. In a week of heavy
+# documentation work, a block three sessions old can still be the only place an open
+# question is written down, and rolling it moves that question out of the file that
+# /resume actually loads. The pre-existing safety rule asks "is this block's SUBSTANCE
+# preserved somewhere?" -- which is a different and weaker question than "is anything
+# in here still OPEN?". A block can satisfy the first and still bury the second.
+#
+# Measured on 2026-08-30, the run that prompted the ruling: five blocks were rolled
+# under the age rule; sessions 60 and 61 carried live unresolved items (the three
+# CHALLENGED Art decisions plus [DEC-258] 🚧 OPEN; the rename ruling owed on
+# [DEC-071]/[DEC-083]/[DEC-107]/[DEC-117]). Both were recoverable only because a human
+# read them. Nothing in the tooling looked.
+#
+# HARD markers BLOCK the roll and have no override -- "ever" was the ruling. The way
+# to unblock a block is to resolve the item or re-home it, which is the correct
+# incentive. SOFT markers are ADVISORY: a good checkpoint always says what it left
+# undone, so blocking on that phrase would freeze the file permanently. They are
+# printed by name so that silence never means "I did not look".
+# RULED 2026-08-30 by Cenay, and this is the whole invariant:
+#   "nothing can be removed out of the file if it's open, outstanding, work in
+#    process or otherwise not complete."
+#
+# THE GATE FAILS TOWARD HOLDING, ON PURPOSE. A false positive costs a block that
+# stays in a file it was already in. A false negative loses work. Those are not
+# symmetric, so every judgement call below resolves toward refusing -- which is why
+# a bare glyph inside quoted prose still counts, and why nothing here was narrowed
+# to cut noise. Noise is the cheap failure.
+#
+# THERE ARE NO SOFT MARKERS ANY MORE. The earlier split had "left undone",
+# "carried forward", "deferred" and "parked" as advisory, reasoning that every good
+# checkpoint says what it left undone, so blocking on the phrase would freeze the
+# file. That optimized for the file getting shorter, which is not the requirement.
+
+# ── THE GATE IS PER-REPO OPT-IN ────────────────────────────────────────────────
+#
+# ⛔ RULED 2026-08-31 by Cenay: the [DEC-267] no-override gate is FRAN-DASH ONLY.
+#
+# WHY THIS SEAM EXISTS. This file is a SHARED_SCRIPTS asset — `sync-shared.sh`
+# delivers it to eleven repos. The gate was ruled for fran-dash, whose
+# CURRENT_STATUS.md is a working ledger with live open items in it. Shipping it
+# on-by-default would silently impose that ruling on ten repos that never made
+# it, including ones (`video-transcription`, `Staff_Form`) that are not
+# doc-ledger projects at all. ✅ Measured before choosing the default: run against
+# `dashboard`'s real CURRENT_STATUS.md, the gate would hold 7 of its 11 session
+# blocks — so "on by default" is not a theoretical imposition.
+#
+# ★ A MARKER FILE, NOT A FLAG, AND THAT IS THE WHOLE POINT. A `--gate` flag would
+# be an override by another name: any by-hand `roll` that omitted it would sweep
+# past the gate, which is exactly what "no override, ever" forbids. The marker is
+# a property of the REPO, so every invocation in fran-dash is gated and no
+# invocation anywhere else is. Same shape as `.claude/ledger-siblings`.
+#
+# ⚠️ THE RESIDUAL RISK, STATED: deleting the marker turns the gate off silently.
+# It is committed, so the deletion shows up in a diff — but nothing refuses it.
+# That is a real (small) hole in "no override" and it is named here rather than
+# papered over.
+GATE_MARKER = ".claude/sweep-gate"
+
+
+def gate_enabled(start=None):
+    """Is the unresolved-item gate switched on for THIS repo?
+
+    Returns (bool, note). The note is printed by callers so that a disabled gate
+    is always visible — ⛔ silence must never be the difference between "checked
+    and clean" and "did not look", which is the failure this whole file exists
+    to prevent.
+    """
+    here = pathlib.Path(start or ".").resolve()
+    for d in (here, *here.parents):
+        if (d / GATE_MARKER).exists():
+            return True, ""
+        if (d / ".git").exists():
+            break
+    return False, (f"gate NOT enabled here (no {GATE_MARKER}) — "
+                   "unresolved-item checks were SKIPPED, not passed")
+
+
+HARD_MARKERS = [
+    ("open status glyph", re.compile("[\U0001F6A7⏰⏳⏸\U0001F7E1]")),
+    ("unchecked task box", re.compile(r"^\s*[-*]\s\[ \]")),
+    ("ruling owed", re.compile(
+        r"UNRULED|UNDECIDED|UNRESOLVED|needs? a ruling|need a ruling from|awaiting a ruling", re.I)),
+    ("challenged decision", re.compile(r"CHALLENGED")),
+    ("open in caps", re.compile(r"\bOPEN\b")),
+    ("work in process", re.compile(
+        r"\bWIP\b|work in progress|work in process|\bin progress\b|mid-entry", re.I)),
+    ("not complete", re.compile(
+        r"not complete|incomplete|unfinished|not finished|not started|never started"
+        r"|not yet|yet to be|still owed|\bowed\b|left undone|carried forward", re.I)),
+    ("to do / to be determined", re.compile(r"\bTODO\b|\bTBD\b")),
+    ("outstanding", re.compile(r"\boutstanding\b", re.I)),
+    ("deferred / parked / revisit", re.compile(
+        r"\b(?:deferred|parked|revisit|follow[- ]up)\b", re.I)),
+    ("blocked / waiting", re.compile(r"blocked on|waiting on|\bawaiting\b|\bpending\b", re.I)),
+    ("section headed as open", re.compile(
+        r"^#{2,4} .*\b(open|unresolved|outstanding|owed|blocked|pending|carried forward"
+        r"|to be decided|in progress|next steps?)\b", re.I)),
+]
+
+# Kept as an empty list rather than deleted: the reporting path still distinguishes
+# blocking from advisory, and a future ruling may re-introduce one. An empty list is
+# a stated position; a deleted code path is an accident waiting to be re-added.
+SOFT_MARKERS = []
+
+# Both heading forms. The archive is uniformly "## Session Summary (session N",
+# which is what SESSION_RE above parses; CURRENT_STATUS.md switched to
+# "## Session N — ..." around session 63, and cmd_roll was blind to the new form --
+# it raised "session N not found", so it failed loudly rather than silently, but a
+# sweep of sessions 63+ was impossible.
+CURRENT_SESSION_RE = re.compile(r"^## (?:Session Summary \(session (\d+)|Session (\d+)\b)")
+
+
+def current_session_number(line):
+    m = CURRENT_SESSION_RE.match(line)
+    if not m:
+        return None
+    return int(m.group(1) or m.group(2))
+
+
+def open_decision_ids(ledger_path):
+    """IDs whose ledger Status line carries the 🚧 OPEN marker.
+
+    Returns (ids, note). `note` is non-empty when the ledger could not be read --
+    the caller must surface it rather than treating an empty set as "nothing open".
+    """
+    path = pathlib.Path(ledger_path)
+    if not path.exists():
+        return set(), f"ledger not found at {ledger_path} -- open-decision citations NOT checked"
+    ids, cur = set(), None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^#+\s+(DEC-\d+|G\d+)\b", line)
+        if m:
+            cur = m.group(1)
+            continue
+        if cur and re.match(r"^[-*]?\s*\*\*Status:\*\*", line):
+            if "🚧" in line:
+                ids.add(cur)
+            cur = None
+    return ids, ""
+
+
+def unresolved_findings(block, open_ids):
+    """(hard, soft) findings for one session block.
+
+    `block` is a list of lines. The managed link-definition block is excluded: it is
+    generated, and its [DEC-NNN]: lines are not citations by the session's author.
+    """
+    body, in_links = [], False
+    for line in block:
+        if LINK_BLOCK_RE.match(line):
+            in_links = True
+        if not in_links:
+            body.append(line)
+        if line.startswith("<!-- link-doc-refs:end"):
+            in_links = False
+
+    hard, soft = [], []
+    for i, line in enumerate(body):
+        for label, pat in HARD_MARKERS:
+            if pat.search(line):
+                hard.append((label, i, line.strip()))
+        for label, pat in SOFT_MARKERS:
+            if pat.search(line):
+                soft.append((label, i, line.strip()))
+
+    text = "".join(body)
+    for did in sorted(set(re.findall(r"\[(DEC-\d+)\]", text)) & open_ids):
+        hard.append((f"discusses {did}, still OPEN in the ledger -- the entry itself never moves, but this block describes unfinished work", -1, ""))
+    return hard, soft
+
+
+def report_unresolved(session, hard, soft, note, stream=sys.stderr):
+    if note:
+        print(f"  \u26a0\ufe0f  {note}", file=stream)
+    if hard:
+        print(f"\u26d4 REFUSED session {session}: it carries {len(hard)} unresolved "
+              f"item(s). Nothing moved.", file=stream)
+        for label, ln, txt in hard:
+            where = f"line +{ln}: " if ln >= 0 else ""
+            print(f"     - {label} -- {where}{txt[:110]}", file=stream)
+        print("     Resolve the item, or re-home it into TODOS.md / DECISIONS.md / "
+              "NEXT_STEPS.md, then roll.\n     There is no override: ruled 2026-08-30 "
+              "by Cenay -- a block carrying an unresolved item never rolls.", file=stream)
+    if soft:
+        print(f"  \u26a0\ufe0f  session {session}: {len(soft)} ADVISORY marker(s) -- "
+              f"not blocking, read them:", file=stream)
+        for label, ln, txt in soft:
+            print(f"     - {label} -- line +{ln}: {txt[:110]}", file=stream)
+    if not hard and not soft:
+        print(f"  \u2705 session {session}: no unresolved markers, no open-decision "
+              f"citations.", file=stream)
+
+
 class Archive:
     """header | [session blocks] | tail(link-doc-refs block)
 
@@ -298,13 +497,100 @@ def cmd_move(args):
     return 0
 
 
+def split_current_blocks(lines):
+    """CURRENT_STATUS.md -> {session_number: [lines]}. Sub-headings travel with
+    their parent block, which is why the scan is for session headings only."""
+    starts = [i for i, l in enumerate(lines) if current_session_number(l) is not None]
+    end = next((i for i, l in enumerate(lines) if LINK_BLOCK_RE.match(l)), len(lines))
+    out = {}
+    for a, b in zip(starts, starts[1:] + [end]):
+        out[current_session_number(lines[a])] = lines[a:b]
+    return out
+
+
+def cmd_guard_removal(args):
+    """⛔ THE INVARIANT, ENFORCED AGAINST HAND EDITS -- not just against this tool.
+
+    Ruled 2026-08-30 by Cenay: nothing leaves CURRENT_STATUS.md while it is open,
+    outstanding, work in process or otherwise not complete.
+
+    `roll` refusing is not enough: it guards ONE code path. A session block can be
+    deleted by an editor, a bad merge, a script, or by me. This compares the staged
+    file against HEAD and refuses the COMMIT, which is the only place every path
+    converges. Same shape as Check 4b's append-only guard on docs/history/.
+    """
+    import subprocess
+    # ⚠️ Per-repo opt-in since 2026-08-31 (fran-dash only). ⛔ Exits 0 so a repo
+    # without the marker commits exactly as it did before this tool gained a
+    # gate -- but it SAYS SO, because a guard that is off and silent is
+    # indistinguishable from a guard that ran and found nothing.
+    on, why = gate_enabled(pathlib.Path(args.current).parent)
+    if not on:
+        print(f"  note: {why}", file=sys.stderr)
+        return 0
+    path = args.current
+    try:
+        head = subprocess.run(["git", "show", f"HEAD:{path}"], capture_output=True,
+                              text=True, check=True).stdout.splitlines(keepends=True)
+    except subprocess.CalledProcessError:
+        print(f"  note: {path} has no HEAD version -- nothing to compare, skipping",
+              file=sys.stderr)
+        return 0
+    staged = subprocess.run(["git", "show", f":{path}"], capture_output=True,
+                            text=True).stdout.splitlines(keepends=True)
+    if not staged:
+        staged = pathlib.Path(path).read_text(encoding="utf-8").splitlines(keepends=True)
+
+    before, after = split_current_blocks(head), split_current_blocks(staged)
+    open_ids, note = open_decision_ids(args.ledger)
+    if note:
+        print(f"  ⚠️  {note}", file=sys.stderr)
+
+    gone, shrunk, failed = [], [], False
+    for num, block in sorted(before.items(), reverse=True):
+        hard, _ = unresolved_findings(block, open_ids)
+        if num not in after:
+            if hard:
+                gone.append((num, hard))
+                failed = True
+        elif hard and len(after[num]) < len(before[num]):
+            shrunk.append((num, len(before[num]) - len(after[num]), len(hard)))
+
+    for num, hard in gone:
+        print(f"⛔ REFUSED: session {num} was REMOVED from {path} while carrying "
+              f"{len(hard)} unresolved item(s):", file=sys.stderr)
+        for label, ln, txt in hard[:6]:
+            where = f"line +{ln}: " if ln >= 0 else ""
+            print(f"     - {label} -- {where}{txt[:100]}", file=sys.stderr)
+        if len(hard) > 6:
+            print(f"     ... and {len(hard) - 6} more", file=sys.stderr)
+    if failed:
+        print("   Nothing open, outstanding or in progress may leave this file "
+              "(ruled 2026-08-30). Restore the block, or resolve/re-home the items "
+              "first. There is no override.", file=sys.stderr)
+        return 1
+
+    for num, lost, nhard in shrunk:
+        print(f"  ⚠️  session {num} SHRANK by {lost} line(s) and still carries "
+              f"{nhard} unresolved marker(s) -- allowed, because resolving an item "
+              f"legitimately shortens a block. READ THE DIFF.", file=sys.stderr)
+
+    checked = sum(1 for b in before.values() if unresolved_findings(b, open_ids)[0])
+    print(f"  ✅ no unresolved session block left {path} "
+          f"({checked} of {len(before)} block(s) carry unresolved items and are held)")
+    print("     NOT checked: whether text was deleted from INSIDE a surviving block "
+          "-- that is reported as a shrink warning above, never blocked, because it "
+          "is indistinguishable from resolving an item in place.", file=sys.stderr)
+    return 0
+
+
 def cmd_roll(args):
     cur_path, arc_path = pathlib.Path(args.current), pathlib.Path(args.archive)
     cur_before = cur_path.read_text().splitlines(keepends=True)
     arc_before = arc_path.read_text().splitlines(keepends=True)
 
-    head = re.compile(rf"^## Session Summary \(session {args.session}\b")
-    start = next((i for i, l in enumerate(cur_before) if head.match(l)), None)
+    start = next((i for i, l in enumerate(cur_before)
+                  if current_session_number(l) == args.session), None)
     if start is None:
         raise SystemExit(f"error: session {args.session} not found in {cur_path}")
     end = next((i for i, l in enumerate(cur_before) if LINK_BLOCK_RE.match(l)), len(cur_before))
@@ -313,6 +599,18 @@ def cmd_roll(args):
     block = cur_before[start:nxt]
     while block and block[-1].strip() == "":
         block.pop()
+
+    # ⛔ THE UNRESOLVED-ITEM GATE -- ruled 2026-08-30, no override. See HARD_MARKERS.
+    # ⚠️ Per-repo opt-in since 2026-08-31: fran-dash only. See GATE_MARKER.
+    on, why = gate_enabled(cur_path.parent)
+    if not on:
+        print(f"⚠️  {why}", file=sys.stderr)
+    else:
+        open_ids, note = open_decision_ids(args.ledger)
+        hard, soft = unresolved_findings(block, open_ids)
+        report_unresolved(args.session, hard, soft, note)
+        if hard:
+            return 1
 
     cut = start
     while cut > 0 and cur_before[cut - 1].strip() == "":
@@ -369,6 +667,7 @@ def main():
 
     ARCHIVE = "docs/history/CURRENT_STATUS-archive.md"
     CURRENT = "docs/CURRENT_STATUS.md"
+    LEDGER = "docs/DECISIONS.md"
 
     c = sub.add_parser("check", help="verify descending order (exit 1 on failure)")
     c.add_argument("archive", nargs="?", default=ARCHIVE)
@@ -387,6 +686,13 @@ def main():
     o.add_argument("--current", default=CURRENT)
     o.add_argument("--archive", default=ARCHIVE)
     o.add_argument("--stamp", default="")
+    o.add_argument("--ledger", default=LEDGER)
+
+    g = sub.add_parser("guard-removal", help="refuse a commit that removes an "
+                       "unresolved session block from CURRENT_STATUS.md")
+    g.add_argument("--current", default=CURRENT)
+    g.add_argument("--ledger", default=LEDGER)
+    g.set_defaults(func=cmd_guard_removal)
     o.add_argument("--dry-run", action="store_true")
     o.set_defaults(func=cmd_roll)
 
