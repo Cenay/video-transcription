@@ -175,6 +175,16 @@ terms:
     heard:
       - laravel verb
 
+  # ----------------------------------------------------------------- Paolo --
+  # Added 2026-09-01 via /add-term.
+  - correct: Paolo
+    heard:
+      - Paulo
+      - paula  # GM/gatekeeper during Art's Croatia absence; 4x 'Paulo' + 1x 'paula' in the 2026-08-25 Art meeting; 'paula' forced, vouched by Cenay 2026-09-01
+    force:
+      - Paulo
+      - paula
+
 # ---------------------------------------------------------------------------
 # DELIBERATELY NOT INCLUDED — each of these was measured and left out. Recorded
 # so nobody "helpfully" adds them later without knowing why.
