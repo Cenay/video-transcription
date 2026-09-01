@@ -137,6 +137,7 @@ terms:
       - nine through  # 6 manglings in the 2026-08-18 Art meeting alone
       - knight through  # 6 manglings in the 2026-08-18 Art meeting alone
       - 9th grid  # 6 manglings in the 2026-08-18 Art meeting alone
+      - 9th root  # 2026-08-24 Art meeting: 'exactly the way 9th root had it' — pipeline caught '9th route', not '9th root'
     force:
       # `9th route` and `9th grid` were listed here too and removed 2026-08-20:
       # `9th` is not an ordinary English word, so the classifier already applies
