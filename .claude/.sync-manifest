@@ -1,13 +1,13 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-08-29 14:15 MST
+# Last synced: 2026-09-01 11:44 MST
 e1fad792a169d0789d2b166a7d14cbab22a6adfbece64adb4b17f9b330951a68  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 c0e61ad160d419f0190134863f84a1cbbe655886d2ab828f1d4f508986a2a0ad  .claude/skills/wrap-up/SKILL.md
 ab6dafc437cf44a3879f84fb94eaa4b6ffc3fc758cd82bcec668942e92be5f09  .claude/skills/next-step/SKILL.md
 43ff059656b6287489f07054e275557acf907f38a239c6d5cdd2b7e7a1dae59e  .claude/commands/init-project.md
 cc0da2cf1ac194761095301d1a216cb51d01a253e00a3f3194bdf5bad9b2b0c6  .claude/commands/resume.md
 9a50013b99d1b34cea0522c0c9250c8891213f736f3e113723f4d9850efba4e8  .claude/commands/ship.md
-91a368a5d15f8132e444023ce82650696ef9eb0545f943e2ff1dd7f12dfc375b  .claude/commands/bug.md
+02276cc4cea91d12acfd66086ddae81a7019120ccfe74c327b1cdf5ee91d360e  .claude/commands/bug.md
 549cfd3ed51c6d9dfd3f45547d832cc4e7fa378ba41d1a0c6fef74c9ab5e2415  .claude/commands/file-bug.md
 0922a92fef26604cd676c5b521ba8c0116435caf68934940e69dabe305c3038c  .claude/commands/build-timer-note.md
 3bc9e45011090a4479820f41b74dfaf482c5b4ed01cc30ff11a2d033088e3a6b  .claude/guides/doc-style-reference.md
@@ -20,7 +20,7 @@ d081e97bd4cb944f4ad0166478c0a69694eafa02887e2868c5e4ccd0d83e7820  .claude/script
 2977323aa737ac69588a5f0bd834d4f7562d7bc3ee010d3379da438b05ffe08e  .claude/scripts/ledger-lint.py
 0f841c88eed7f78fed85b6ba206045acb4030da1d0112f9f7cc3cd97d02a047f  .claude/scripts/check-append-only.py
 37ba8ed91739a4655e80905b9ae2362e0a9772bdf48c0464642235bb69fcadcd  .claude/scripts/check-ledger-lint.py
-d93a42549728fb83931fdc4bc284e28bf2a9d1c2aff3ee981ac03d27ccd614b7  .claude/scripts/sweep-archive.py
+072299f83ccb49a93a73353a404e026cf78d32838f2e35f83781871ab2d8b3b7  .claude/scripts/sweep-archive.py
 c50b5c0e387b68793a17d7c437a62b8e9ed697bed1e23dbf761458e137fed8d1  .claude/scripts/check-status-doc-updated.sh
 0791ece3e15911648f3e8db582e4f1ae3ab017d570c577ed04e3771d86f292ab  .claude/scripts/doc_root.py
 b485dfa0921abcc032fc04aec1e82bde4e8637ed86def76c104eea66bfb87d7e  .github/ISSUE_TEMPLATE/bug_report.yml

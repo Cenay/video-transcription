@@ -1,11 +1,16 @@
 ---
 name: bug
-description: File a bug into the project's ledger (docs/BUG-REPORT.md) — a verified BUG- entry, or a labeled SUSP- (suspected / needs-investigation) entry for hunches that need research. Follows the bug-report style guide.
+description: DEPRECATED — being phased out in favor of /file-bug. Files a bug into the project's ledger (docs/BUG-REPORT.md) only, with no GitHub Issue. Use /file-bug unless you deliberately want the local ledger and nothing else.
+superseded_by: file-bug
 ---
 
 File a bug report for the current project. The argument is a short description of the defect: `$ARGUMENTS`.
 
-> **Sibling command — `/file-bug`.** This command (`/bug`) is the **ledger-only** lane: it writes the entry into `docs/BUG-REPORT.md` and stops. Its sibling `/file-bug` is the **GitHub lane** — it files the same entry as a native GitHub Issue and mirrors it into the ledger. The two run in parallel by design ([DEC-126]); the format below is identical for both. If this repo files bugs as Issues, prefer `/file-bug`; use `/bug` when you only want the local ledger.
+> ⛔ **DEPRECATED — use `/file-bug`.** Ruled by Cenay 2026-09-01: this command is **being phased out**, and `/file-bug` is the one to reach for. It files the same entry as a native GitHub Issue **and** mirrors it into `docs/BUG-REPORT.md`; the entry format below is identical for both, so nothing is lost by switching.
+>
+> ★ **This completes [DEC-126] rather than reversing it.** That decision already moved bugs to the hosting platform's issue tracker — *"we'd be able to easily close, reopen, comment, discuss everything on the issues"* (Khurram) — and the two-lane arrangement was the transition, not the destination. ⚠️ **The earlier wording here said the lanes "run in parallel by design", which is no longer true.**
+>
+> ⓘ **`/bug` still works** and is not being deleted today. Reach for it only when you deliberately want the local ledger and **no** Issue — and say why, because the default is now `/file-bug`.
 
 ## The one rule that matters
 
