@@ -69,6 +69,9 @@ terms:
                         #      "Haram and Karam" — the engine hearing the same
                         #      name two ways in a single sentence.
       - keram           #   1
+      - Koran  # dictation mishearing of the teammate's name
+    force:
+      - Koran
 
   # ----------------------------------------------------------------- Cenay --
   # Also never transcribed correctly: zero correct occurrences in the archive.
