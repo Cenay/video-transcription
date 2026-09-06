@@ -42,7 +42,7 @@ plans/
 |---|---|---|
 | `<DOCS>/history/` | `/checkpoint` — closed next-steps, rolled-down stamp blocks | ✅ tracked |
 | `<DOCS>/SESSION-DESK.md` | the `session-desk` skill — the live desk, one level ABOVE the archives | ⛔ **gitignored**, see below |
-| `<DOCS>/sessions/` | archived desks, **flat** — `DESK-<slug>-<stamp>.md`. Hand-named ad-hoc copies also live here and are **not** listed by `/resume-session-desk` | ⛔ gitignored |
+| `<DOCS>/sessions/` | archived desks, **flat** — `DESK-YYYY-MM-DD-<slug>-HHMM.md`. Hand-named ad-hoc copies also live here and are **not** listed by `/resume-session-desk` | ⛔ gitignored |
 | `<DOCS>/intake/meetings/` | `meeting-reconcile` — meeting reconciliation notes | ⛔ **gitignored** |
 | `<DOCS>/intake/prs/` | `pr-reconcile` — PR harvest notes, kept indefinitely as a corpus | ⛔ **gitignored** |
 
@@ -419,7 +419,7 @@ Show a tree-style summary of what was created:
 │   │   └── NEXT_STEPS-archive.md   # closed next-steps overflow
 │   ├── SESSION-DESK.md             # ⛔ .gitignore — the live desk, exactly one
 │   ├── sessions/                   # ⛔ .gitignore — archived desks, FLAT
-│   │   └── DESK-<slug>-<stamp>.md  #    being in here is what makes a desk an archive
+│   │   └── DESK-YYYY-MM-DD-<slug>-HHMM.md  # being in here is what makes a desk an archive
 │   └── intake/                     # ✅ TRACKED — only the two subfolders below are not
 │       ├── meetings/               # ⛔ .gitignore — meeting reconciliation notes
 │       └── prs/                    # ⛔ .gitignore — PR harvest notes, kept as a corpus

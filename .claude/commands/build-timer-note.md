@@ -22,9 +22,24 @@ Never invent work. If you cannot determine what was done, say so plainly and sto
 - **Granularity: one bullet per task.** Distinct tasks stay separate even when they touch the same feature. Do not roll a whole feature into one line, and do not split a single task across multiple lines. Typically 10–20 bullets; fewer is fine for a short session.
 - **Length: 4–20 words per bullet.** Enough to identify the work, no more.
 - **Voice: client-readable.** Plain business English describing the *outcome*. No filenames, function names, flags, commit SHAs, or tool jargon. A non-technical reader should understand every line.
-  - Good: `- Added a one-command way to file a bug report`
+  - Good: `- Added a one-command way to file a bug report (claude-personal-toolkit)`
   - Bad: `- Created commands/bug.md with frontmatter and symlinked it`
-- **Format: plain dashes**, sentence case, no trailing periods, no nesting, no sub-bullets.
+- **Every bullet ends with its repo's short name in parentheses.** The short name is the repo folder's basename — `fran-dash`, `trfaapi.com`, `claude-personal-toolkit` — never a path, never an owner prefix, never the display title. It is the one piece of tool vocabulary the rule above allows, because time gets billed per project and a list of outcomes with no project against them cannot be entered.
+
+  ```
+  - Primary site navigation now pulled from the database instead of hardcoded links (fran-dash)
+  ```
+
+  **Which repo goes on a bullet:** the one the work actually landed in, decided **per bullet, not per session**. A session run from one repo routinely changes another — a meeting reconciliation writes into several, a toolkit change lands in the repos it is synced to — and a bullet attributed to the session's own folder in those cases is billed to the wrong project. So attribute from where the change went, not from where you were sitting.
+
+  ⚠️ **The one exception: work drawn from a session note** — a Session Desk, a checkpoint, a status or decision doc — **takes the repo the session is running in**, since a note records what was discussed rather than where anything landed:
+
+  ```bash
+  basename "$(git rev-parse --show-toplevel)"
+  ```
+
+  Use that same value for anything else you genuinely cannot attribute — and if a bullet's repo is a guess rather than something you saw in the work, say so in one line under the list rather than guessing silently.
+- **Format: plain dashes**, sentence case, no trailing periods, no nesting, no sub-bullets. The repo name in parentheses is the last thing on the line.
 - **Bullets only.** No header, no date, no time estimate, no closing summary, no commentary — except the fallback notice above when it applies.
 - Order the bullets roughly chronologically.
 
