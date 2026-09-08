@@ -17,7 +17,7 @@ name: single-writer-docs
 
 on:
   pull_request:
-    branches: [master]
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
 
 # Deliberately NOT filtered with `paths:`. A required status check that never
