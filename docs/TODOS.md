@@ -20,6 +20,40 @@ Small quality-of-life polish items for the transcription pipeline. Add new ideas
 
 ## Active
 
+### ⛔ Fix the wordlist dependency — a missing `/usr/share/dict/words` silently disables the risky-variant guard
+**Found 2026-08-21 while scoping the Windows port. This is a live latent bug on Linux too, not a Windows-only concern.** Full write-up: `plans/port-transcription-to-windows-brief.md` → §1.
+
+`scripts/terms.py:30` hardcodes `WORDLIST_PATH = Path("/usr/share/dict/words")`, and `_load_wordlist()` (`terms.py:42–46`) **returns an empty set when the file is missing** instead of raising. Empty `_WORDS` → `is_ordinary_english()` (`:52–59`) is always `False` for tokens over 2 chars → `is_risky()` (`:62–69`) is always `False`. **The guard that refuses substitutions which would corrupt ordinary prose never fires**, so every variant is treated as safe.
+
+✅ **Verified by mutation test 2026-08-21** — `terms.py` imported, `WORDLIST_PATH` repointed at a nonexistent path, `_WORDS` reloaded, `is_risky()` compared across both states:
+
+| Variant | with wordlist (102,485 words) | without (0 words) |
+|---|---|---|
+| `nick` | `True` refused | **`False` allowed** |
+| `art` | `True` refused | **`False` allowed** |
+| `make` | `True` refused | **`False` allowed** |
+
+Those are exactly the roster terms the guard protects — `nick` → **Nik**, **Art** ("too short and ordinary to auto-correct"), `make` a **Jake** near-miss. It would rewrite ordinary English into teammate names, then feed that into `meeting-reconcile` → `DECISIONS.md`.
+
+**The fix, three parts:**
+1. Ship `config/words.txt` in-repo instead of depending on the OS — removes the platform dependency and makes behavior identical everywhere.
+2. Make a missing wordlist **loud** — raise, or refuse all risky substitutions rather than allowing all of them. Same principle as `corrections=[]` vs `corrections=None` in [DEC-010]: silence must not mean both "nothing there" and "nobody looked".
+3. Add a negative test — assert `is_risky("nick") is True` with the list present, and assert the missing-list path fails loudly. A guard not shown to fail on broken input has not been tested.
+
+⚠️ **Not checked:** whether this changes published output end-to-end. The unit-level inversion is proven; the path from `terms.yml` through `preview_corrections.py` to a real transcript was not traced. Confirm before calling the fix done.
+
+### Fix three hardcoded `/tmp` cache paths
+`transcriber.py:42`, `diagnose_analysis.py:17`, `repair_global_options.py:22` all default to `/tmp` where `pipeline.py:86` correctly uses `tempfile.gettempdir()`. ⚠️ **Consequence if missed:** the cache directory diverges from the one `pipeline.py` writes, so `--from-cache` silently misses and re-transcribes at full cost. One-line fix each.
+
+### Make `pipeline.py` emit the Notion page ID instead of printing it for re-parsing
+`pipeline.py:337` already sets `result["notion_page_id"]` and then discards it; `transcribe-this.sh:138` scrapes it back out of stdout with GNU-only `grep -oP 'notion\.so/\K[a-f0-9]+'`. Emitting it properly (a `--print-page-id` flag or a JSON line) removes the GNU dependency **and** the fragile stdout coupling. Prerequisite for any wrapper rewrite.
+
+### Fix the `python -c` quoting hazard in the wrapper
+`transcribe-this.sh:174–178` interpolates `$S3_URL` straight into a `python -c` string. `$NOTION_PAGE_ID` is grep-extracted hex so it is safe, but `$S3_URL` derives from the filename — an apostrophe in a filename breaks the quoting. ⚠️ **Believed from reading, not tested.** Disappears for free in any wrapper rewrite.
+
+### Commit the desktop integration into the repo
+✅ **Verified 2026-08-21** by `ls ~/.local/share/nautilus/scripts/` — **"Transcribe This"** and **"Transcribe This --no-cleanup"** exist entirely outside version control. A machine rebuild loses them silently. Commit them as installable assets (relevant to the Windows port, but worth doing regardless).
+
 ### Build step 4 — Layer 2 `word_boost` at transcription
 The next real build in `plans/term-normalization.md`, and the strongest remaining lever: the engine has a **zero-percent** hit rate on `Khurram` and `Cenay` across 83 meetings, and names are exactly what `word_boost` is for. Wire-in: `scripts/transcriber.py`, the `aai.TranscriptionConfig(...)` call in `transcribe_audio()` — add `word_boost=TERMS.boost_list()` and `boost_param=aai.WordBoost.high`. ⚠️ **Cannot be verified `--from-cache`** — it changes what AssemblyAI returns, so it costs a real transcription run to measure.
 
