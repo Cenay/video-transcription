@@ -188,6 +188,14 @@ terms:
       - Paulo
       - paula
 
+  # ---------------------------------------------------------------- Claude --
+  # Added 2026-09-09 via /add-term.
+  - correct: Claude
+    heard:
+      - cloud
+    force:
+      - cloud
+
 # ---------------------------------------------------------------------------
 # DELIBERATELY NOT INCLUDED — each of these was measured and left out. Recorded
 # so nobody "helpfully" adds them later without knowing why.
