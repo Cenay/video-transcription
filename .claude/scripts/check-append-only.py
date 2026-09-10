@@ -30,6 +30,10 @@ Two renderings of one line are also not a disappearance — see `_words()`: a li
 survives if some single new line carries every word of it, ignoring punctuation
 and the stamp label (`_Last updated` -> `- _Prior:` is a demotion, not a loss).
 
+Deleting a history file, or moving one out of docs/history/, is every line of it
+leaving at once and fails in BOTH modes — see `staged_files()` for the day the
+staged scan could not see either.
+
 Usage:
     check-append-only.py --staged              # every staged docs/history/ file
     check-append-only.py FILE [FILE...]        # named files, worktree vs HEAD
@@ -67,7 +71,21 @@ def lines_of(text):
 
 
 def staged_files(root):
-    out = git(["diff", "--cached", "--name-only", "--diff-filter=ACM"], cwd=root) or ""
+    """Every staged path under docs/history/, INCLUDING deletions.
+
+    ⛔ This used to filter on `--diff-filter=ACM` — added, copied, modified — so a
+    deleted history file, or one renamed out of the folder, was simply not in the
+    list, and the guard printed "nothing staged under docs/history/" over it.
+    Measured 2026-09-10: `git rm docs/history/X-stamp-history.md`, staged, exit 0
+    with that message; and a `git mv` out of docs/history/ went through the same
+    gap the same day. Named-file mode has always called a missing file a failure
+    ("deletion of a history file is always a failure"), so the two modes disagreed.
+
+    ★ `--no-renames`, deliberately: a rename is reported as a deletion plus an
+    addition, so a file LEAVING docs/history/ is a deletion of a history file —
+    which is what it is. The override is the loud, deliberate path for a move.
+    """
+    out = git(["diff", "--cached", "--name-only", "--no-renames"], cwd=root) or ""
     return [f for f in out.split("\n") if f.startswith(HISTORY_DIR) and f.endswith(".md")]
 
 
@@ -102,19 +120,25 @@ def _words(line):
     return collections.Counter(re.findall(r"[A-Za-z0-9]+", STAMP_LABEL_RE.sub("", line.strip())))
 
 
+DELETED = "DELETED"
+
+
 def check(path, root, staged):
-    """Returns (ok, lost_lines, note). note is set when the check could NOT run."""
+    """Returns (ok, lost_lines, note). note is set when the check could NOT run,
+    or is DELETED when the whole file is gone — every line of it is then lost."""
     before = content_head(path, root)
     if before is None:
         return True, [], "new file (no HEAD version) — nothing to compare"
     if staged:
         after = content_staged(path, root)
         if after is None:
-            return True, [], "not staged — skipped"
+            # The path is in the staged list but has no index blob: a staged
+            # deletion (or the old half of a rename, under --no-renames).
+            return False, sorted(lines_of(before)), DELETED
     else:
         p = root / path
         if not p.exists():
-            return False, [], None  # deletion of a history file is always a failure
+            return False, sorted(lines_of(before)), DELETED
         after = p.read_text(encoding="utf-8")
     gone = lines_of(before) - lines_of(after)
     if not gone:
@@ -184,9 +208,12 @@ def main():
     override = os.environ.get(OVERRIDE) == "1"
     failures, notes, checked = [], [], []
 
+    deleted = set()
     for t in targets:
         ok, lost, note = check(t, root, use_staged)
-        if note:
+        if note == DELETED:
+            deleted.add(t)
+        elif note:
             notes.append(f"{t}: {note}")
             continue
         checked.append(t)
@@ -209,7 +236,11 @@ def main():
     print(f"{'⚠' if override else '✗'} APPEND-ONLY VIOLATION — {total} line(s) would leave "
           f"{len(failures)} history file(s) [{verb}]")
     for t, lost in failures:
-        print(f"\n  {t} — {len(lost)} line(s) removed:")
+        if t in deleted:
+            print(f"\n  {t} — the WHOLE FILE is deleted or moved out of "
+                  f"{HISTORY_DIR} ({len(lost)} line(s)):")
+        else:
+            print(f"\n  {t} — {len(lost)} line(s) removed:")
         for l in lost[:5]:
             print(f"    - {l[:150]}")
         if len(lost) > 5:
@@ -222,7 +253,8 @@ def main():
     print("  may leave it. Recover the lines with:")
     print(f"    git show HEAD:<file>")
     print("")
-    print(f"  If the removal IS deliberate (e.g. merging two renderings of one")
+    print(f"  If the removal IS deliberate (merging two renderings of one record,")
+    print(f"  or moving a living doc OUT of {HISTORY_DIR} because it is not a")
     print(f"  record), re-run with {OVERRIDE}=1 and say so in the commit message.")
     print("")
     return 1
