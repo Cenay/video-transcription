@@ -97,7 +97,11 @@ fi
 # ★ So this check knows nothing about stamps or links. It compares LINE SETS, so
 # it catches ANY writer that removes a line -- including tools nobody has written
 # yet. It does not need to know where the next bug will be.
-if [ -n "$(git diff --cached --name-only --diff-filter=ACM | grep '^docs/history/.*\.md$')" ]; then
+# ⛔ No --diff-filter here, and --no-renames, deliberately (2026-09-10): with
+# ACM a `git rm` of a history file, or a `git mv` out of the folder, was not in
+# this list, so the guard below was never called and the deletion committed
+# clean. The guard itself sees deletions; this gate has to let them reach it.
+if [ -n "$(git diff --cached --name-only --no-renames | grep '^docs/history/.*\.md$')" ]; then
   AO=''
   for cand in '.claude/scripts/check-append-only.py' 'scripts/check-append-only.py' \
               '/mnt/k/Code/claude-personal-toolkit/scripts/check-append-only.py'; do
