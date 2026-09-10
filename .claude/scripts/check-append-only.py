@@ -26,6 +26,10 @@ Set semantics, deliberately: reordering passes (the history files are sorted
 newest-first and get re-sorted), and removing a DUPLICATE copy passes (a line is
 "present" if it appears at least once). Only genuine disappearance fails.
 
+Two renderings of one line are also not a disappearance — see `_words()`: a line
+survives if some single new line carries every word of it, ignoring punctuation
+and the stamp label (`_Last updated` -> `- _Prior:` is a demotion, not a loss).
+
 Usage:
     check-append-only.py --staged              # every staged docs/history/ file
     check-append-only.py FILE [FILE...]        # named files, worktree vs HEAD
@@ -75,13 +79,27 @@ def content_staged(path, root):
     return git(["show", f":{path}"], cwd=root)
 
 
+# ★ A STAMP'S LABEL IS MARKUP, NOT CONTENT. `_Last updated X_` and `- _Prior: X_`
+# are one record in two renderings: stamp-doc.py demotes the current stamp to a
+# `_Prior:` row every time it stamps a doc, and that is the ONLY text change it
+# ever makes to a stamp. Measured 2026-09-10 in LSP/Staff_Form: stamping
+# `docs/history/NEXT_STEPS-archive.md` (an archive that lives under history/ and
+# so is guarded) tripped this check on exactly the two words "Last updated", and
+# the commit went through on ALLOW_HISTORY_SHRINK=1. An override taken for
+# healthy work is how an override becomes a reflex, so the label is stripped
+# before the words are counted. Everything after the label — timestamp, zone,
+# transcript, summary — is still content and still may not leave.
+STAMP_LABEL_RE = re.compile(r"^-?\s*_(?:Last updated|Prior:)\s+")
+
+
 def _words(line):
     """Word multiset of a line, for the content comparison in check().
 
     Punctuation and markup are ignored on purpose: `DEC-132` and `[DEC-132]`
     must compare equal, because bracketing an id adds no words and removes none.
+    The stamp label (`_Last updated` / `_Prior:`) is markup too — see above.
     """
-    return collections.Counter(re.findall(r"[A-Za-z0-9]+", line))
+    return collections.Counter(re.findall(r"[A-Za-z0-9]+", STAMP_LABEL_RE.sub("", line.strip())))
 
 
 def check(path, root, staged):
