@@ -53,11 +53,18 @@ gh pr list --repo <owner/name> --state merged --json number,title,author,mergedA
 - **Exclude the user's own PRs.** She lands her results in the ledgers before pushing, so they are harvested by construction.
 - **Report the count with titles**, above the next-steps list, and recommend `/pr-reconcile --since`. **Show the titles** so the judgement stays with the reader — a raw number alone eventually trains her to ignore it.
 - ⛔ **Warn, never auto-run.** This command only reads.
-- **Nothing unharvested, or `gh` unavailable?** One line, or silence, and continue. Never a gate.
+- ⛔ **A sibling path that does not exist is SKIPPED LOUDLY, never silently.** That rule is `.claude/ledger-siblings`' own, stated in its header, and this step must honour it: ★ **a teammate without the sibling checked out gets a warning, not a false clean run.** ⚠️ Silence here is the dangerous reading — *"nothing unharvested"* and *"I could not look"* are opposite answers, and only one of them is good news. Say which siblings were skipped and why, then continue.
+- **Nothing unharvested, or `gh` unavailable?** One line, or silence, and continue. Never a gate. ⚠️ **This does not cover a missing sibling checkout** — see the bullet above; that one is reported, not swallowed.
 
 ## Step 2: Load Context
 
-Read the following files (skip any that don't exist). `<DOCS>` is `docs/` for projects under `/mnt/k/Code/`, or `.cloaked/docs/` for client sites under `/mnt/k/_Sites/`:
+Read the following files (skip any that don't exist). **Resolve `<DOCS>` with the tool, never from the repo's path:**
+
+```bash
+DOCS=$(python3 .claude/scripts/doc_root.py "$(git rev-parse --show-toplevel)")   # almost always: docs
+```
+
+⛔ **Do not infer it from a path prefix.** Two reasons, and the second is why this is written as an instruction rather than left to judgement: **(1)** a path rule only recognises *this* machine's layout, so a teammate whose checkout is anywhere else matches no branch at all and the command starts guessing; **(2)** the old `_Sites` → `.cloaked/docs` split is **retired** — ✅ ruled by Cenay 2026-08-29, the convention is `docs/` everywhere. `doc_root.py` ranks **evidence** (an existing doc set) above convention, so a repo that genuinely still keeps its docs elsewhere resolves correctly anyway. ⓘ If Python or the script is unavailable, fall back to whichever of `docs/` or `.cloaked/docs/` actually exists — and say which you used.
 
 1. `CLAUDE.md` — project overview and conventions
 2. `<DOCS>/CURRENT_STATUS.md` — where we left off
