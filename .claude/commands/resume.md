@@ -43,10 +43,18 @@ gh pr status 2>/dev/null      # "Requesting a code review from you" section, thi
 
 ```bash
 # the SET of harvested numbers (not a high-water mark — backlogs are sparse)
-ls docs/intake/prs/*-pr*-reconciliation.md 2>/dev/null | sed -E 's/.*-pr([0-9]+)-.*/\1/' | sort -n
+ls $DOCS/intake/prs/*-pr*-reconciliation.md 2>/dev/null | sed -E 's/.*-pr([0-9]+)-.*/\1/' | sort -n
 # merged PRs in each sibling named by .claude/ledger-siblings, above the floor
 gh pr list --repo <owner/name> --state merged --json number,title,author,mergedAt
 ```
+
+⛔ **Those filenames are NECESSARY but NOT SUFFICIENT — check the second lane before reporting anything.** A teammate's PR can reach the ledger through a **meeting reconciliation** instead of a PR harvest, and that lane writes no `intake/prs/` note, so the filename test calls it unharvested **forever**. ✅ **Measured 2026-09-17 in `fran-dash`:** `TRFA-API#62` reported as unharvested when it had been ruled as `DEC-342` from the 2026-09-16 API meeting the day before. **Before naming a PR, grep for its number:**
+
+```bash
+grep -rl "<repo-tag>#<n>\b" $DOCS/DECISIONS.md $DOCS/intake/ 2>/dev/null   # e.g. TRFA-API#62
+```
+
+**A hit in the ledger or in any intake note means it is already harvested — drop it silently.** ⚠️ Report only the PRs with *no* reference anywhere, and say which test cleared the rest, so the reader can tell "nothing outstanding" from "I only checked one lane." ★ **The cost of the false positive is not noise, it is trust:** a recurring nag the reader knows is wrong trains them to skip the whole step, including the true findings it exists to surface.
 
 - **Scope it to the siblings named in `.claude/ledger-siblings`** — the repos that share a decision series. ⛔ **Not every repo**; that is the noise Step 1b rightly avoids.
 - ⛔ **A floor is required.** Without one the query reaches back years — ✅ an unfloored run returned 20 PRs back to 2023. The floor is the earliest PR worth harvesting (currently `TRFA-API#20`).
