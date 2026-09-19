@@ -43,14 +43,31 @@ rules that only matter for a self-linking file:
   3. SAME-FILE LINKS USE A BARE FRAGMENT ("#dec-122-…", not "DECISIONS.md#dec-122-…"),
      which is what both VS Code preview and GitHub want for an intra-document anchor.
 
+SCOPE (changed 2026-09-19). By default only .md files with UNCOMMITTED changes
+-- staged, unstaged or untracked -- are rewritten, resolved via git, exactly as
+reflow-md.py does. Pass --all to rewrite every .md under the directory.
+
+  ⛔ The ID MAP is always built from the WHOLE tree and is never scoped. A map
+  built from "whatever happens to be uncommitted" is a PARTIAL map, and every
+  managed block regenerates against it -- deleting the definitions it could not
+  see. That is Guard 1's disaster by another road.
+
+  WHY the default changed: a /checkpoint run in fran-dash rewrote 21 files, 19
+  of which the session had never touched. The edits were correct and owed, but
+  under the single-writer rule a concurrent session's in-flight docs would have
+  been swept into that commit with no warning -- and the checkpoint skill runs
+  this tool right beside reflow-md.py, which was already scoped this way.
+
 Usage:
-    python3 link-doc-refs.py <docs-dir>            # apply in place
+    python3 link-doc-refs.py <docs-dir>            # uncommitted .md only (default)
+    python3 link-doc-refs.py <docs-dir> --all      # every .md under the directory
     python3 link-doc-refs.py <docs-dir> --dry-run  # report only, write nothing
     python3 link-doc-refs.py <docs-dir> --quiet    # apply, summary only
 """
 
 import os
 import re
+import subprocess
 import sys
 
 # Reference forms as they appear in prose. G has no dash ("G75").
@@ -400,6 +417,46 @@ def iter_docs(docs_dir):
                 yield os.path.join(root, f)
 
 
+def git_changed_md(path):
+    """
+    .md files under `path` with UNCOMMITTED changes — staged, unstaged, or
+    untracked. Returns None if `path` is not inside a git work tree, so the
+    caller can decide what to do rather than silently rewriting everything.
+
+    ⓘ Lifted from reflow-md.py's function of the same name rather than written
+    afresh, so the two tools agree on what "this session changed" means. If one
+    is fixed, fix both.
+    """
+    try:
+        top = subprocess.run(
+            ["git", "-C", path, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "-C", top, "status", "--porcelain"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return None
+
+    want = os.path.abspath(path)
+    files = []
+    for line in status.splitlines():
+        if len(line) < 4:
+            continue
+        entry = line[3:]
+        if " -> " in entry:            # rename: take the destination
+            entry = entry.split(" -> ", 1)[1]
+        entry = entry.strip().strip('"')
+        if not entry.endswith(".md"):
+            continue
+        full = os.path.abspath(os.path.join(top, entry))
+        if full == want or full.startswith(want.rstrip(os.sep) + os.sep):
+            if os.path.isfile(full):
+                files.append(full)
+    return files
+
+
 def unresolved_in(docs_dir, ledger_paths, id_map):
     """Report referenced IDs that have no ledger heading (left untouched)."""
     missing = {}
@@ -479,8 +536,33 @@ def main():
             f"       seen from inside docs/history/. Point it at the docs root."
         )
 
+    # ⛔ GUARD 3 — SCOPE THE REWRITE TO THIS SESSION'S EDITS, NEVER THE ID MAP.
+    #
+    # `all_md` above feeds TWO roles and only ONE of them may be narrowed. The
+    # id_map must be built from the WHOLE tree — the ledger and the frozen
+    # records live wherever they live, and a map built from "whatever happens to
+    # be uncommitted" is a PARTIAL map, which regenerates every managed block
+    # against it and deletes the definitions it could not see. That is Guard 1's
+    # disaster arriving by a different road.
+    #
+    # ✅ Measured 2026-09-19 in fran-dash, which is why this exists: a checkpoint
+    # ran `link-doc-refs.py docs` and rewrote 21 files, 19 of which the session
+    # had never touched. The edits were correct and owed — but under the
+    # single-writer rule a concurrent session's in-flight docs would have been
+    # swept into that commit with no warning. reflow-md.py already scopes this
+    # way; this tool did not, and the checkpoint skill ran them side by side.
+    rewrite_set = all_md
+    skipped_scope = False
+    if "--all" not in flags:
+        changed = git_changed_md(docs_dir)
+        if changed is None:
+            skipped_scope = True          # not a git work tree — see below
+        else:
+            changed = set(changed)
+            rewrite_set = [p for p in all_md if p in changed]
+
     changed_docs = []
-    for doc in all_md:
+    for doc in ([] if skipped_scope else rewrite_set):
         if doc in frozen_paths:
             continue
         # Self-link mode for the ledger: suppresses links from an entry to itself.
@@ -496,9 +578,17 @@ def main():
     missing = unresolved_in(docs_dir, set(target_files), id_map)
 
     tag = "[dry-run] would link" if dry else "linked"
+    scope = "all" if "--all" in flags else "uncommitted"
     print(f"ids resolvable: {len(id_map)} (DEC/G/M/D across "
-          f"{len(target_files)} ledger/record file(s))")
-    print(f"{tag}: {len(changed_docs)} narrative doc(s)")
+          f"{len(target_files)} ledger/record file(s) — ALWAYS the whole tree)")
+    if skipped_scope:
+        print(f"link-doc-refs: {docs_dir} is not in a git work tree — nothing rewritten. "
+              f"Re-run with --all to link every .md under it.")
+    print(f"{tag}: {len(changed_docs)} narrative doc(s) "
+          f"(scope: {scope} — {len(rewrite_set)} candidate file(s) of {len(all_md)})")
+    if not skipped_scope and "--all" not in flags and not changed_docs:
+        print("link-doc-refs: nothing uncommitted to link "
+              "(this is the default scope — pass --all to widen it).")
     if not quiet:
         for rel, n in changed_docs:
             print(f"  - {rel}: {n} reference(s)")
