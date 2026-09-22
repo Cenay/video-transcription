@@ -196,6 +196,14 @@ terms:
     force:
       - cloud
 
+  # ------------------------------------------------------------------- Nik --
+  # Added 2026-09-22 via /add-term.
+  - correct: Nik
+    heard:
+      - Nick
+    force:
+      - Nick
+
 # ---------------------------------------------------------------------------
 # DELIBERATELY NOT INCLUDED — each of these was measured and left out. Recorded
 # so nobody "helpfully" adds them later without knowing why.
