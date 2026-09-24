@@ -1,6 +1,6 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-09-24 12:15 MST
+# Last synced: 2026-09-24 12:56 MST
 e1fad792a169d0789d2b166a7d14cbab22a6adfbece64adb4b17f9b330951a68  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 c0e61ad160d419f0190134863f84a1cbbe655886d2ab828f1d4f508986a2a0ad  .claude/skills/wrap-up/SKILL.md
 ab6dafc437cf44a3879f84fb94eaa4b6ffc3fc758cd82bcec668942e92be5f09  .claude/skills/next-step/SKILL.md
@@ -9,7 +9,7 @@ dfe9f56fae27703df6336b466ec5f03f62cd990fb50090fb3d4fee88979f0ed5  .claude/comman
 9a50013b99d1b34cea0522c0c9250c8891213f736f3e113723f4d9850efba4e8  .claude/commands/ship.md
 02276cc4cea91d12acfd66086ddae81a7019120ccfe74c327b1cdf5ee91d360e  .claude/commands/bug.md
 549cfd3ed51c6d9dfd3f45547d832cc4e7fa378ba41d1a0c6fef74c9ab5e2415  .claude/commands/file-bug.md
-fab1cf730fb2b8e5b3a00fbd0116e06caff380c36bc6767758ccecc99932e92d  .claude/commands/build-timer-note.md
+3fa0eecae17310a3744d9463bd8ba56fb00e8718d60dd7442c5d4b149434fe82  .claude/commands/build-timer-note.md
 3bc9e45011090a4479820f41b74dfaf482c5b4ed01cc30ff11a2d033088e3a6b  .claude/guides/doc-style-reference.md
 f56063257dc3cd333706748da25d9a1f11e303a0ce55d4632771eb900c16b3a3  .claude/guides/bug-report-style.md
 7df500ec95f38ab943fd75de4ed39e28568890be58cda8803cfaad8042ee9307  .claude/scripts/link-doc-refs.py
@@ -18,6 +18,7 @@ ef9cbce99349fd007f627061245fe92c454b90b45c61b57090a2b029199ab75a  .claude/script
 b9ae276b6710b1cb4955b2590fab196f02c9c9396045734a060c4195eccfe913  .claude/scripts/ledger_contract.py
 d081e97bd4cb944f4ad0166478c0a69694eafa02887e2868c5e4ccd0d83e7820  .claude/scripts/write-entry.py
 2977323aa737ac69588a5f0bd834d4f7562d7bc3ee010d3379da438b05ffe08e  .claude/scripts/ledger-lint.py
+1ea30a9d8d3db7a7a57e05c61d3d9a9b4230510c627cba476d02f06209c694b5  .claude/scripts/timer-commits.py
 00f607170441cc4e815d5f57eb1a3915c89adcb4423487488e7b2dc3708f32fd  .claude/scripts/check-append-only.py
 37ba8ed91739a4655e80905b9ae2362e0a9772bdf48c0464642235bb69fcadcd  .claude/scripts/check-ledger-lint.py
 072299f83ccb49a93a73353a404e026cf78d32838f2e35f83781871ab2d8b3b7  .claude/scripts/sweep-archive.py

@@ -3,9 +3,30 @@ name: build-timer-note
 description: Summarize this session's work as a client-readable bulleted list, printed and copied to the clipboard for a time-tracking entry.
 ---
 
-Produce a short bulleted summary of what was accomplished in **this conversation**, suitable for pasting into a time-tracking note. An optional request to include all "conversations" for a given date (or range) can also be requested. When in doubt, refer to the GitHub repo(s) requested. 
+Produce a short bulleted summary of work done, suitable for pasting into a time-tracking note. **With no date, it covers this conversation. With a date or two, it covers every work repo for that window** — see *Dated mode* below.
 
-## Source of truth
+## Dated mode — a date, or two dates
+
+When the request names a date (`9/23`, `2026-09-23`, `yesterday`) or a range (`9/22 - 9/23`), gather the commits with the script. ⛔ **Do not compute the window or pick the repos yourself** — the rules below are in the script, tested, and easy to get subtly wrong by hand:
+
+```bash
+S=.claude/scripts/timer-commits.py; [ -f "$S" ] || S=/mnt/k/Code/claude-personal-toolkit/scripts/timer-commits.py
+python3 "$S" 9/23                          # one date
+python3 "$S" 9/22 9/23                     # a range
+python3 "$S" 9/23 --include-personal       # only when the user says "include personal"
+python3 "$S" 9/23 --repo fran-dash         # only when the user names specific repos
+```
+
+What the script decides (✅ ruled by Cenay 2026-09-24):
+
+- **One date** → 00:00 to 23:59 of that date. **Two dates** → 00:00 of the first to 23:59 of the second.
+- **Rollover:** if it is now the day *after* the end date and **before 6:00am**, the window runs to *now*, because you were still working past midnight. At 9/24 04:30, `9/23` means 9/23 00:00 → 9/24 04:30. ⓘ The 6am cutoff exists because "after 11:59pm" is true forever: without one, asking for 9/23 on 9/26 would bill three days to one date.
+- **Repos:** by default, **every work repo** — each git repo under `/mnt/k/Code` and `/mnt/k/_Sites` — **except the personal one, `Code/System`**, and anything in `.archived/`. ⚠️ **`claude-personal-toolkit` is work, never personal.** Only the words *"include personal"* add `System`; only named repos narrow the scope.
+- Your commits only (by `git config user.name`), from all branches, merges excluded, **deduplicated by hash**, since `Cenay/N8N` is cloned twice.
+
+Turn the commits into bullets under the same *Output rules* below, attributing each bullet to the repo the script lists it under. If this conversation's own work falls inside the window and isn't committed yet, include it too. **Relay every `⚠️` line the script prints as one line under the list** — roots not found, repos not searched — so a thin list is never mistaken for a quiet day. ⓘ Overlap between two notes is fine: a note explains one timer entry, and the timer, not the note, is what bills. ⓘ On a machine without those roots (a teammate's), the script reports that and searches the current repo only.
+
+## Source of truth (no date given)
 
 1. **Primary — this conversation.** Summarize the work actually done in the current session: tasks completed, things built, problems solved, decisions made.
 2. **Fallback — git history.** Only if this conversation has little or no substantive work to summarize (e.g. it was just started, or context was cleared), pull the recent commit one-liners for the current repo:
@@ -40,7 +61,7 @@ Never invent work. If you cannot determine what was done, say so plainly and sto
 
   Use that same value for anything else you genuinely cannot attribute — and if a bullet's repo is a guess rather than something you saw in the work, say so in one line under the list rather than guessing silently.
 - **Format: plain dashes**, sentence case, no trailing periods, no nesting, no sub-bullets. The repo name in parentheses is the last thing on the line.
-- **Bullets only.** No header, no date, no time estimate, no closing summary, no commentary — except the fallback notice above when it applies.
+- **Bullets only.** No header, no date, no time estimate, no closing summary, no commentary — except the fallback notice above and dated mode's `⚠️` lines, when they apply.
 - Order the bullets roughly chronologically.
 
 ## Delivery
