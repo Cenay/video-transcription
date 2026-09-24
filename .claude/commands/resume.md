@@ -28,9 +28,21 @@ A blocked PR is a **teammate stuck**, not a tidy-up task. On repos with branch p
 
 ```bash
 gh pr status 2>/dev/null      # "Requesting a code review from you" section, this repo
+# open PRs by someone else that request NO reviewer, and that you have not reviewed
+# since their last commit. ME must prefix the gh call itself — gh's --jq reads it via env.
+ME=$(gh api user --jq .login 2>/dev/null) gh pr list --state open \
+  --json number,title,author,isDraft,reviewRequests,createdAt,latestReviews,commits \
+  --jq '.[] | select(.isDraft | not) | select(.author.login != env.ME) | select(.reviewRequests == [])
+    | ([.latestReviews[] | select(.author.login == env.ME) | .submittedAt] | max) as $mine
+    | (.commits | map(.committedDate) | max) as $head
+    | select($mine == null or $head > $mine)
+    | "#\(.number) \(.title) (@\(.author.login), open \((now - (.createdAt | fromdate)) / 86400 | floor) days\(if $mine then ", new commits since your review" else "" end))"' 2>/dev/null
 ```
 
-- **Any PRs awaiting this user's review?** Say so in the briefing, with the number, title and author — and put it **above** the next-steps list. Someone else's blocked work usually outranks your own backlog.
+⚠️ **`gh pr status` alone misses a PR that names no reviewer** — its *"Requesting a code review from you"* section is driven by `reviewRequests`, so an empty list cannot appear there. ✅ **Measured 2026-09-24 in `fran-dash`:** `trfa-fran-dash#56` (40 files, +6,037 lines, open four days) went unreported by `/resume` because it requested no one. Under the reviewed-PR route to `main`, an open, unreviewed PR is the teammate-stuck signal **whether or not GitHub was told whom to ask** — hence the second query.
+
+- **Any PRs awaiting this user's review?** Say so in the briefing, with the number, title and author — and put it **above** the next-steps list. Someone else's blocked work usually outranks your own backlog. List the second query's hits in the same line as *"open, no reviewer requested: #N title (@author, open N days)"*.
+- **What the second query deliberately drops:** drafts; the user's own PRs; PRs that request *someone else* (they are waiting on that person); and PRs **the user has already reviewed with no commit since** — those wait on the author, not on the user. ★ **A commit after the user's latest review brings it back**, flagged *"new commits since your review"*, because authors routinely push fixes without re-requesting. ✅ Each path tested 2026-09-24 against `#56`: silent as its reviewer, reported for a user who never reviewed, silent as its author, and reported with the flag when the review is dated before the last commit.
 - **Widen the net only if asked** — `gh search prs --review-requested=@me --state=open` covers every repo, which is useful at the start of a day but noisy inside a single project's briefing.
 - **`gh` missing, not authenticated, no network, or the call errors?** One line, or stay silent, and continue. Same rule as the freshness check: **this must never block the briefing**, and it must never be the reason a `/resume` feels slow. It is a courtesy check, not a gate.
 - **Nothing pending?** Say nothing at all. An empty review queue is not news.
@@ -90,7 +102,7 @@ Present a dense, actionable briefing. No fluff. Lead with the freshness warning 
 
 **{PROJECT_NAME}** | Last checkpoint: {copy the `**Snapshot:**` line's stamp from CURRENT_STATUS.md verbatim (older repos still label it `**Last updated:**` — accept either; see the note below) — the full `YYYY-MM-DD HH:MM TZ`, not just the date}
 
-**⏳ Waiting on your review:** {From step 1b — `#<number> <title> (@<author>)`, one line each. **Omit this line entirely when the queue is empty.**}
+**⏳ Waiting on your review:** {From step 1b — `#<number> <title> (@<author>)`, one line each; PRs from the second query read `open, no reviewer requested: #<number> <title> (@<author>, open N days)`. **Omit this line entirely when the queue is empty.**}
 
 **Where we left off:** {1-2 sentences from CURRENT_STATUS.md "In Progress" and "Session Summary"}
 

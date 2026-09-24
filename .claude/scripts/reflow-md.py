@@ -20,6 +20,10 @@ WHAT IS LEFT UNTOUCHED (never joined):
     (`**Status:** ...`, `⚠️ **Time-bounded:** ...`, `★ **Build impact:** ...`)
   - Link reference definitions ([id]: url)
   - Blank lines (paragraph separators are preserved exactly)
+  - Markdown hard line breaks: a line ending in TWO OR MORE spaces, or in a
+    backslash. Its trailing characters are kept exactly and the next line is
+    never joined onto it. (One trailing space is stray whitespace and is still
+    trimmed.)
 
 WHAT IS JOINED:
   - Consecutive non-blank prose lines -> one line (single space between).
@@ -95,6 +99,13 @@ HTML_BLOCK_RE = re.compile(
 # any document that *describes* the escape (a skill, a guide, this file's own
 # docstring) silently exempts itself. That bit immediately on the first run.
 IGNORE_RE = re.compile(r"^\s*<!--\s*reflow-md:\s*ignore\s*-->\s*$", re.IGNORECASE)
+# A Markdown hard line break: two-plus trailing spaces, or a trailing backslash,
+# after real content. The trailing spaces ARE the markup -- stripping them turns
+# a rendered line break into a soft one. Found 2026-09-24 when a /checkpoint
+# reflow removed all 306 of them from fran-dash's docs/AREAS_OF_CONCERN.md,
+# where they put each **Priority:** / **Status:** field on its own rendered line.
+# A lone trailing space is NOT a break (CommonMark needs two) and stays trimmed.
+HARD_BREAK_RE = re.compile(r"\S(?: {2,}|\\)$")
 
 
 def has_ignore_marker(text):
@@ -230,12 +241,18 @@ def reflow(text):
             i += 1
             continue
 
-        # Reflowable line.
+        # Reflowable line. A hard break keeps its trailing markup and closes the
+        # logical line, so nothing joins onto it; the line itself may still join
+        # onto the previous one, since a soft break renders as a space anyway.
+        hard = HARD_BREAK_RE.search(raw)
         if buf is None or starts_logical_line(raw):
             flush()
-            buf = raw.rstrip()
+            buf = raw if hard else raw.rstrip()
         else:
-            buf = buf + " " + stripped
+            buf = buf + " " + (raw.lstrip() if hard else stripped)
+        if hard:
+            out.append(buf)
+            buf = None
         i += 1
 
     flush()
