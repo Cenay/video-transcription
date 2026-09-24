@@ -1,6 +1,6 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-09-24 12:56 MST
+# Last synced: 2026-09-24 14:59 MST
 e1fad792a169d0789d2b166a7d14cbab22a6adfbece64adb4b17f9b330951a68  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 c0e61ad160d419f0190134863f84a1cbbe655886d2ab828f1d4f508986a2a0ad  .claude/skills/wrap-up/SKILL.md
 ab6dafc437cf44a3879f84fb94eaa4b6ffc3fc758cd82bcec668942e92be5f09  .claude/skills/next-step/SKILL.md
@@ -12,7 +12,7 @@ dfe9f56fae27703df6336b466ec5f03f62cd990fb50090fb3d4fee88979f0ed5  .claude/comman
 3fa0eecae17310a3744d9463bd8ba56fb00e8718d60dd7442c5d4b149434fe82  .claude/commands/build-timer-note.md
 3bc9e45011090a4479820f41b74dfaf482c5b4ed01cc30ff11a2d033088e3a6b  .claude/guides/doc-style-reference.md
 f56063257dc3cd333706748da25d9a1f11e303a0ce55d4632771eb900c16b3a3  .claude/guides/bug-report-style.md
-7df500ec95f38ab943fd75de4ed39e28568890be58cda8803cfaad8042ee9307  .claude/scripts/link-doc-refs.py
+8fea0242d83375770da9430a5df61a83f19823bbe9a5c05b593836ce2c4c7484  .claude/scripts/link-doc-refs.py
 ef9cbce99349fd007f627061245fe92c454b90b45c61b57090a2b029199ab75a  .claude/scripts/reflow-md.py
 88a8001aa964f0fea58bbd78e9464fc604ccca2f9f8d9f9e2710f50b919aeebd  .claude/scripts/stamp-doc.py
 b9ae276b6710b1cb4955b2590fab196f02c9c9396045734a060c4195eccfe913  .claude/scripts/ledger_contract.py

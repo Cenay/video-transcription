@@ -259,6 +259,7 @@ def rewrite_doc(abspath, docs_dir, id_map, dry, self_relpath=None):
 
     out_lines = []
     in_fence = False
+    in_index = False
     for idx, line in enumerate(src_lines):
         if line.lstrip().startswith("```"):
             in_fence = not in_fence
@@ -266,6 +267,20 @@ def rewrite_doc(abspath, docs_dir, id_map, dry, self_relpath=None):
             continue
         if in_fence:
             out_lines.append(line)
+            continue
+        # THE GENERATED DECISIONS INDEX PASSES THROUGH UNTOUCHED, for the same
+        # reason headings do: each row's title is a verbatim COPY of a heading,
+        # written by gen-dec-index.py. Bracketing a bare ID there made the row
+        # differ from what the generator writes, so `gen-dec-index --check` said
+        # STALE after every link run, forever -- found 2026-09-24 on a title
+        # citing "DEC-073" bare. Definitions are still collected from the whole
+        # text below, so an ID already bracketed in a row keeps its link.
+        if "<!-- dec-index:start" in line:
+            in_index = True
+        if in_index:
+            out_lines.append(line)
+            if "<!-- dec-index:end" in line:
+                in_index = False
             continue
         # HEADINGS PASS THROUGH UNTOUCHED. Rewriting one would change its own slug
         # and break every link aimed at it (and re-break it on the next run).
