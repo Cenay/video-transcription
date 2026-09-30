@@ -546,13 +546,52 @@ def cmd_guard_removal(args):
     if note:
         print(f"  ⚠️  {note}", file=sys.stderr)
 
-    gone, shrunk, failed = [], [], False
+    def staged_or_disk(p):
+        txt = subprocess.run(["git", "show", f":{p}"], capture_output=True, text=True).stdout
+        if not txt and pathlib.Path(p).exists():
+            txt = pathlib.Path(p).read_text(encoding="utf-8")
+        return txt
+
+    staged_text = "".join(staged)
+    archive_txt = staged_or_disk(args.archive)
+    todos_txt = staged_or_disk(args.todos)
+    recorded = {}
+    for l in archive_txt.splitlines():
+        m = AUDIT_LINE_RE.match(l)
+        if m:
+            recorded[m.group(2)] = m.group(1)
+
+    def carried_out(block, hard):
+        """[DEC-379]: every flagged line has a verdict in the archive, and every
+        carried one is in TODOS. Returns the list of what is missing."""
+        missing = []
+        for label, ln, txt in hard:
+            if ln < 0:
+                continue
+            # A flagged line still in the staged file has not left it. This matters
+            # because split_current_blocks() lets a session block absorb a following
+            # non-session "## " section that `roll` (which stops at the next "## ")
+            # leaves behind -- without this, those lines would demand a verdict.
+            if txt.strip() in staged_text:
+                continue
+            v = recorded.get(flag_hash(txt))
+            if v is None:
+                missing.append(("no audit verdict in the archive", ln, txt.strip()))
+            elif v == "carried" and carried_text(txt) not in todos_txt:
+                missing.append(("carried, but not found in TODOS", ln, txt.strip()))
+        return missing
+
+    gone, shrunk, failed, carried_ok = [], [], False, []
     for num, block in sorted(before.items(), reverse=True):
         hard, _ = unresolved_findings(block, open_ids)
         if num not in after:
             if hard:
-                gone.append((num, hard))
-                failed = True
+                missing = carried_out(block, hard)
+                if missing:
+                    gone.append((num, missing))
+                    failed = True
+                else:
+                    carried_ok.append(num)
         elif hard and len(after[num]) < len(before[num]):
             shrunk.append((num, len(before[num]) - len(after[num]), len(hard)))
 
@@ -570,18 +609,119 @@ def cmd_guard_removal(args):
               "first. There is no override.", file=sys.stderr)
         return 1
 
+    for num in carried_ok:
+        print(f"  ✅ session {num} left with flagged lines, every one accounted for in the "
+              f"archive's audit record ([DEC-379])", file=sys.stderr)
     for num, lost, nhard in shrunk:
         print(f"  ⚠️  session {num} SHRANK by {lost} line(s) and still carries "
               f"{nhard} unresolved marker(s) -- allowed, because resolving an item "
               f"legitimately shortens a block. READ THE DIFF.", file=sys.stderr)
 
-    checked = sum(1 for b in before.values() if unresolved_findings(b, open_ids)[0])
-    print(f"  ✅ no unresolved session block left {path} "
-          f"({checked} of {len(before)} block(s) carry unresolved items and are held)")
+    held = sum(1 for n, b in before.items() if n in after and unresolved_findings(b, open_ids)[0])
+    print(f"  ✅ no unresolved session block left {path} without an audit record "
+          f"({len(carried_ok)} left with every flagged line accounted for; {held} still in "
+          f"the file carry flagged lines and are held)")
     print("     NOT checked: whether text was deleted from INSIDE a surviving block "
           "-- that is reported as a shrink warning above, never blocked, because it "
           "is indistinguishable from resolving an item in place.", file=sys.stderr)
     return 0
+
+
+# ── CARRY: a block leaves once every flagged line is accounted for ─────────────
+#
+# ⛔ RULED 2026-09-29 by Cenay, fran-dash [DEC-379] (amends [DEC-267] for
+# CURRENT_STATUS.md): "Seems like we're carrying a lot that has been done because
+# it's in a session that has one open item." Measured that day: 54 of 54 blocks
+# held, most by one to five flagged lines.
+#
+# THE INVARIANT, STILL NO OVERRIDE: a block with flagged lines may leave only when
+# EVERY flagged line has an audit verdict --
+#   carried   -> copied into TODOS.md as an unticked item (the live home for open work)
+#   done      -> finished since; evidence carries a citation
+#   rehomed   -> still open but already tracked in a live file; evidence names it
+#   not-open  -> the marker word is descriptive; evidence says why
+# The verdicts are written into the archive beside the block, keyed by a short hash
+# of each flagged line, and `guard-removal` re-checks them at the commit: a removed
+# block passes only if every flagged line's hash is in the staged archive, and every
+# carried line's text is in the staged TODOS.md. A `--carry` run is therefore not an
+# override -- it is a different, checkable way to satisfy the same "nothing open is
+# lost" property. A flagged line with no verdict still refuses the whole block.
+#
+# ⓘ A citation of a DEC the ledger still marks OPEN is accepted as re-homed by
+# definition: the ledger entry IS the live home, and it never moves.
+AUDIT_VERDICTS = ("carried", "done", "rehomed", "not-open")
+AUDIT_LINE_RE = re.compile(r"^- AUDIT (carried|done|rehomed|not-open) \[([0-9a-f]{10})\]")
+
+
+def evidence_cites(ev):
+    # CITATION_RE lives with the `items` mode further down; built lazily here.
+    return re.search(CITATION_RE.pattern + r"|\b(?:BUG|SUSP|SMOKE)-\d{4}-\d\d-\d\d-\d{3}\b"
+                     r"|\b[\w.-]+\.md\b", ev) is not None
+
+
+def flag_hash(text):
+    import hashlib
+    return hashlib.sha1(text.strip().encode("utf-8")).hexdigest()[:10]
+
+
+def carried_text(line):
+    """The open item as it lands in TODOS: the line minus its list marker/checkbox."""
+    return re.sub(r"^\s*(?:[-*]\s+)?(?:\[[ xX]\]\s+)?", "", line.strip())
+
+
+def load_audit(path, session):
+    import json
+    data = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+    out = {}
+    for blk in data:
+        if int(blk.get("session", -1)) != session:
+            continue
+        for e in blk.get("entries", []):
+            out[e["line"].strip()] = (e.get("verdict", ""), (e.get("evidence") or "").strip())
+    return out
+
+
+def check_audit(hard, audit):
+    """-> (verdicts {line: (verdict, evidence)}, problems [str]). Refuse on any problem."""
+    verdicts, problems = {}, []
+    for label, ln, txt in hard:
+        if ln < 0:                      # an open-DEC citation: the ledger is its home
+            continue
+        key = txt.strip()
+        if key in verdicts:
+            continue
+        if key not in audit:
+            problems.append(f"no audit verdict for flagged line: {key[:100]}")
+            continue
+        verdict, ev = audit[key]
+        if verdict not in AUDIT_VERDICTS:
+            problems.append(f"unknown verdict {verdict!r} for: {key[:80]}")
+        elif verdict in ("done", "rehomed") and not evidence_cites(ev):
+            problems.append(f"{verdict} needs a citation in its evidence: {key[:80]}")
+        elif verdict in ("not-open", "carried") and len(ev) < 15:
+            problems.append(f"{verdict} needs a one-sentence reason: {key[:80]}")
+        verdicts[key] = (verdict, ev)
+    return verdicts, problems
+
+
+def audit_record(session, verdicts, date):
+    rec = ["\n", f"#### Sweep audit — session {session}, {date} ([DEC-379])\n", "\n"]
+    for line, (verdict, ev) in verdicts.items():
+        rec.append(f"- AUDIT {verdict} [{flag_hash(line)}] {ev}\n")
+    return rec
+
+
+def carry_into_todos(todos_lines, session, carried, date):
+    """Insert a newest-first section of unticked items above the first ## heading."""
+    if not carried:
+        return todos_lines, []
+    add = [f"## Carried from CURRENT_STATUS — session {session} (swept {date}, [DEC-379])\n", "\n"]
+    for line in carried:
+        add.append(f"- [ ] {carried_text(line)} _(carried from `CURRENT_STATUS.md` session "
+                   f"{session}; the block is in `history/CURRENT_STATUS-archive.md`)_\n")
+    add.append("\n")
+    at = next((i for i, l in enumerate(todos_lines) if H2_RE.match(l)), len(todos_lines))
+    return todos_lines[:at] + add + todos_lines[at:], add
 
 
 def cmd_roll(args):
@@ -594,7 +734,13 @@ def cmd_roll(args):
     if start is None:
         raise SystemExit(f"error: session {args.session} not found in {cur_path}")
     end = next((i for i, l in enumerate(cur_before) if LINK_BLOCK_RE.match(l)), len(cur_before))
-    nxt = next((i for i, l in enumerate(cur_before[start + 1:end], start + 1) if H2_RE.match(l)), end)
+    # A block ends at the next "## ", OR at a bare `---` separator, OR at a stamp line.
+    # ⛔ Measured 2026-09-29: fran-dash's stamp block and two file-level notes sat
+    # between session 99 and session 101 after a `---`; ending only at "## " carried
+    # them into the archive inside session 99, and stamp-doc then found no chain.
+    # Stopping early fails SAFE -- anything past the stop stays in the live file.
+    nxt = next((i for i, l in enumerate(cur_before[start + 1:end], start + 1)
+                if H2_RE.match(l) or l.strip() == "---" or l.startswith("_Last updated ")), end)
 
     block = cur_before[start:nxt]
     while block and block[-1].strip() == "":
@@ -602,15 +748,41 @@ def cmd_roll(args):
 
     # ⛔ THE UNRESOLVED-ITEM GATE -- ruled 2026-08-30, no override. See HARD_MARKERS.
     # ⚠️ Per-repo opt-in since 2026-08-31: fran-dash only. See GATE_MARKER.
+    record, todo_adds = [], []
+    todos_path = pathlib.Path(args.todos)
+    todos_before = todos_after = None
     on, why = gate_enabled(cur_path.parent)
     if not on:
         print(f"⚠️  {why}", file=sys.stderr)
     else:
         open_ids, note = open_decision_ids(args.ledger)
         hard, soft = unresolved_findings(block, open_ids)
-        report_unresolved(args.session, hard, soft, note)
-        if hard:
-            return 1
+        if hard and args.carry:
+            # [DEC-379]: the block may leave if every flagged line is accounted for.
+            if not args.audit:
+                raise SystemExit("error: --carry needs --audit <file>")
+            if note:
+                print(f"  ⚠️  {note}", file=sys.stderr)
+            verdicts, problems = check_audit(hard, load_audit(args.audit, args.session))
+            if problems:
+                print(f"⛔ REFUSED session {args.session}: the audit does not account for "
+                      f"every flagged line. Nothing moved.", file=sys.stderr)
+                for p in problems:
+                    print(f"     - {p}", file=sys.stderr)
+                return 1
+            import datetime
+            today = datetime.date.today().isoformat()
+            record = audit_record(args.session, verdicts, today)
+            carried = [l for l, (v, _) in verdicts.items() if v == "carried"]
+            todos_before = todos_path.read_text(encoding="utf-8").splitlines(keepends=True)
+            todos_after, todo_adds = carry_into_todos(todos_before, args.session, carried, today)
+            tally = collections.Counter(v for v, _ in verdicts.values())
+            print(f"  ✅ session {args.session}: {len(verdicts)} flagged line(s) accounted for "
+                  f"({', '.join(f'{n} {v}' for v, n in sorted(tally.items()))})", file=sys.stderr)
+        else:
+            report_unresolved(args.session, hard, soft, note)
+            if hard:
+                return 1
 
     cut = start
     while cut > 0 and cur_before[cut - 1].strip() == "":
@@ -638,7 +810,7 @@ def cmd_roll(args):
     arc = Archive(arc_before)
     if args.session in arc.order():
         raise SystemExit(f"error: session {args.session} is already in the archive")
-    moved = block + ["\n"] + (["---\n", "\n"] if had_separator else [])
+    moved = block + record + ["\n"] + (["---\n", "\n"] if had_separator else [])
     blocks = sorted(arc.blocks + [(args.session, moved)], key=lambda b: -b[0])
 
     header = list(arc.header)
@@ -647,17 +819,221 @@ def cmd_roll(args):
         header = header[:at] + [args.stamp.rstrip("\n") + "\n", "\n"] + header[at:]
 
     arc_after = arc.render(blocks=blocks, header=header)
-    assert_lines_preserved(cur_before + arc_before, cur_after + arc_after,
-                           allowed_adds=[args.stamp] if args.stamp else [])
+    adds = ([args.stamp] if args.stamp else []) + record + todo_adds
+    tb, ta = (todos_before or []), (todos_after or [])
+    assert_lines_preserved(cur_before + arc_before + tb, cur_after + arc_after + ta,
+                           allowed_adds=adds)
 
     if args.dry_run:
         print(f"dry-run: would move {len(block)} line(s); archive order would be "
-              f"{' '.join(str(n) for n, _ in blocks[:6])}...")
+              f"{' '.join(str(n) for n, _ in blocks[:6])}..."
+              + (f"; would carry {max(len(todo_adds) - 3, 0)} open item(s) into {todos_path}"
+                 if todo_adds else ""))
         return 0
     cur_path.write_text("".join(cur_after))
     arc_path.write_text("".join(arc_after))
+    if todos_after is not None and todo_adds:
+        todos_path.write_text("".join(todos_after))
+        print(f"carried {len(todo_adds) - 3} open item(s) into {todos_path}")
     print(f"rolled session {args.session}: {len(block)} lines moved verbatim")
     print(f"archive order: {' '.join(str(n) for n, _ in blocks[:6])}...")
+    return 0
+
+
+# ── ITEM-LEVEL SWEEP (`items`) ──────────────────────────────────────────────────
+#
+# ⛔ RULED 2026-09-14 by Cenay, [DEC-324]: "what's open and live remains; closed,
+# deleted and resolved moves." For TODOS.md / NEXT_STEPS.md the unit is the ITEM,
+# not the session block: if a block holds 1 open item and 5 ticked ones, the 5
+# move and the 1 stays. `roll` is block-scoped and cannot do that, so until
+# 2026-09-29 item sweeps were done by hand. This mode is that hand-sweep as a
+# program, with the same line-preservation guard as `roll`.
+#
+# WHAT MOVES: a ticked item (`- [x]`) at the TOP level of a `## ` section, plus its
+# indented continuation lines, verbatim. It lands under the SAME `## ` heading in
+# the archive -- appended to that section if it exists, otherwise a new section is
+# created in date order (newest on top). A session can therefore appear in the live
+# file AND the archive at once; [DEC-324] says that is intended.
+#
+# WHAT IS HELD, and printed by name (silence never means "did not look"):
+#   - a ticked item whose own continuation holds an unticked `- [ ]` (open work
+#     inside it -- the [DEC-267] invariant, item-sized);
+#   - a ticked item with NO citation (DEC/G id, commit hash, PR/issue #, AOC-/E-
+#     id, or a repo path). That is a PROXY for the [DEC-324] safety rule "the
+#     archive is the backstop, never the sole copy" -- it checks that the item
+#     points somewhere, NOT that the place it points holds its substance.
+#   - nested ticked items stay with their parent; they are never split off it.
+#
+# A section left with only its heading after the sweep loses the heading too (it
+# moved with its items). A section with no items left but PROSE remaining keeps
+# the prose and is reported: prose is not item-shaped and is not this mode's call.
+TICK_RE = re.compile(r"^(\s*)[-*] \[[xX]\]")
+BOX_RE = re.compile(r"^(\s*)[-*] \[[ xX]\]")
+OPEN_BOX_RE = re.compile(r"^\s*[-*] \[ \]")
+DATE_RE = re.compile(r"\b(20\d\d-\d\d-\d\d)\b")
+# A tick does not always mean "all of it is finished": measured on fran-dash's
+# TODOS.md 2026-09-29, 4 ticked items said "STILL OPEN" / "still open" / "not yet
+# confirmed" about a remainder. Fails toward holding, like the [DEC-267] gate.
+RESIDUAL_RE = re.compile(r"still open|not done|reopened|not yet confirmed", re.I)
+# The residual hold lifts only when the item itself says, dated and with a citation,
+# that the remainder was closed or moved somewhere live. Not a flag, not an override:
+# it is written into the item, so the archive copy carries the reason it moved.
+REMAINDER_SETTLED_RE = re.compile(r"\*\*Remainder (?:closed|re-homed) \(\d{4}-\d\d-\d\d[^)]*\):\*\*")
+CITATION_RE = re.compile(
+    r"\[?(?:DEC-\d+|G\d+|AOC-\d+|E-\d+)\]?"          # ledger ids
+    r"|`[0-9a-f]{7,40}`"                               # commit hash in backticks
+    r"|\b(?:PR|issue)\s*#\d+|[\w.-]+#\d+|\(#\d+\)"    # PR / issue refs
+    r"|`?(?:docs|plans|site|tools|specs|\.claude)/[\w./-]+")  # a repo path
+
+
+def _indent(line):
+    return len(line) - len(line.lstrip())
+
+
+def heading_date(heading):
+    m = DATE_RE.search(heading)
+    return m.group(1) if m else None
+
+
+def split_sections(lines):
+    """-> (head, [(heading_line, [body lines])], tail). Tail = link-doc-refs block."""
+    end = next((i for i, l in enumerate(lines) if LINK_BLOCK_RE.match(l)), len(lines))
+    starts = [i for i in range(end) if H2_RE.match(lines[i])]
+    if not starts:
+        return lines[:end], [], lines[end:]
+    secs = [(lines[a], lines[a + 1:b]) for a, b in zip(starts, starts[1:] + [end])]
+    return lines[:starts[0]], secs, lines[end:]
+
+
+def top_level_items(body):
+    """[(start, stop, is_ticked)] for items not nested inside another item."""
+    out, i = [], 0
+    while i < len(body):
+        m = BOX_RE.match(body[i])
+        if not m:
+            i += 1
+            continue
+        ind, j, last = len(m.group(1)), i + 1, i
+        while j < len(body):
+            if body[j].strip() == "":
+                j += 1
+                continue
+            if _indent(body[j]) > ind:
+                last = j
+                j += 1
+                continue
+            break
+        out.append((i, last + 1, bool(TICK_RE.match(body[i]))))
+        i = last + 1
+    return out
+
+
+def cmd_items(args):
+    live_path, arc_path = pathlib.Path(args.live), pathlib.Path(args.archive)
+    live_before = live_path.read_text().splitlines(keepends=True)
+    arc_before = arc_path.read_text().splitlines(keepends=True)
+    head, secs, tail = split_sections(live_before)
+
+    moves, held, new_secs, prose_left = [], [], [], []   # moves: (heading, [item lines])
+    for heading, body in secs:
+        keep, taken = list(body), []
+        for a, b, ticked in reversed(top_level_items(body)):
+            if not ticked:
+                continue
+            item = body[a:b]
+            label = body[a].strip()[:90]
+            if any(OPEN_BOX_RE.match(l) for l in item[1:]):
+                held.append(("open child item", heading.strip(), label))
+                continue
+            if RESIDUAL_RE.search("".join(item)) and not REMAINDER_SETTLED_RE.search("".join(item)):
+                held.append(("says part is still open", heading.strip(), label))
+                continue
+            if not CITATION_RE.search("".join(item)):
+                held.append(("no citation", heading.strip(), label))
+                continue
+            taken.insert(0, item)
+            del keep[a:b]
+            # collapse the blank-line pair the removal leaves behind
+            if a < len(keep) and a > 0 and keep[a].strip() == "" and keep[a - 1].strip() == "":
+                del keep[a]
+        if not taken:
+            new_secs.append((heading, body))
+            continue
+        moves.append((heading, taken))
+        if any(l.strip() for l in keep):
+            new_secs.append((heading, keep))
+            if not any(BOX_RE.match(l) for l in keep):
+                prose_left.append(heading.strip())
+        # else: the section emptied -- its heading moves with its items
+
+    live_after = list(head)
+    for heading, body in new_secs:
+        live_after += [heading] + body
+    live_after += tail
+
+    a_head, a_secs, a_tail = split_sections(arc_before)
+    a_secs = [(h, list(b)) for h, b in a_secs]
+    created = []
+    for heading, items in moves:
+        payload = []
+        for it in items:
+            payload += it + ([] if it[-1].strip() == "" else ["\n"])
+        idx = next((k for k, (h, _) in enumerate(a_secs) if h == heading), None)
+        if idx is not None:
+            body = a_secs[idx][1]
+            while body and body[-1].strip() == "":
+                body.pop()
+            a_secs[idx] = (heading, body + ["\n"] + payload)
+            continue
+        date = heading_date(heading)
+        # newest on top: before the first section dated OLDER than this one. An
+        # undated heading goes to the BOTTOM -- in practice those are the oldest,
+        # pre-session-numbering sections ("## Active").
+        at = len(a_secs) if date is None else next(
+            (k for k, (h, _) in enumerate(a_secs) if (heading_date(h) or "9999") < date),
+            len(a_secs))
+        a_secs.insert(at, (heading, ["\n"] + payload))
+        created.append((heading.strip(), date))
+
+    a_head = list(a_head)
+    if args.stamp:
+        a_head += [args.stamp.rstrip("\n") + "\n", "\n"]
+    arc_after = list(a_head)
+    for heading, body in a_secs:
+        arc_after += [heading] + body
+    arc_after += a_tail
+
+    # A heading that stays in the live file AND is created in the archive is the one
+    # sanctioned duplicate line; so is the stamp. Everything else must be relocation.
+    live_heads = {h for h, _ in new_secs}
+    created_names = {h for h, _ in created}
+    adds = [h for h, _ in moves if h.strip() in created_names and h in live_heads]
+    # ...and a section that EMPTIED into an archive section of the same name merges
+    # into it, so its heading line exists once where it existed twice.
+    drops = [h for h, _ in moves if h.strip() not in created_names and h not in live_heads]
+    if args.stamp:
+        adds.append(args.stamp)
+    assert_lines_preserved(live_before + arc_before, live_after + arc_after,
+                           allowed_drops=drops, allowed_adds=adds)
+
+    n_items = sum(len(i) for _, i in moves)
+    n_lines = sum(len(x) for _, i in moves for x in i)
+    print(f"{'dry-run: would move' if args.dry_run else 'moved'} {n_items} ticked item(s), "
+          f"{n_lines} line(s) verbatim, from {len(moves)} section(s)")
+    for h, d in created:
+        print(f"  new archive section{'' if d else ' (NO DATE in heading -- placed at the bottom)'}: {h[:90]}")
+    for why, h, label in held:
+        print(f"  ⚠️  HELD ({why}) in {h[:50]}: {label}", file=sys.stderr)
+    for h in prose_left:
+        print(f"  ⚠️  no items left, prose remains -- review by hand: {h[:90]}", file=sys.stderr)
+    print("NOT checked: whether a moved item's substance lives in DECISIONS / LESSONS_LEARNED "
+          "(the citation test is a proxy); nested ticked items (they stay with their parent); "
+          "non-checkbox bullets (never moved).", file=sys.stderr)
+    if args.dry_run:
+        return 0
+    live_path.write_text("".join(live_after))
+    arc_path.write_text("".join(arc_after))
+    print(f"wrote {live_path} and {arc_path}")
     return 0
 
 
@@ -687,14 +1063,28 @@ def main():
     o.add_argument("--archive", default=ARCHIVE)
     o.add_argument("--stamp", default="")
     o.add_argument("--ledger", default=LEDGER)
+    o.add_argument("--carry", action="store_true",
+                   help="[DEC-379]: roll a block with flagged lines once --audit accounts for each")
+    o.add_argument("--audit", default="", help="JSON audit verdicts, for --carry")
+    o.add_argument("--todos", default="docs/TODOS.md", help="where carried open items land")
 
     g = sub.add_parser("guard-removal", help="refuse a commit that removes an "
                        "unresolved session block from CURRENT_STATUS.md")
     g.add_argument("--current", default=CURRENT)
     g.add_argument("--ledger", default=LEDGER)
+    g.add_argument("--archive", default=ARCHIVE)
+    g.add_argument("--todos", default="docs/TODOS.md")
     g.set_defaults(func=cmd_guard_removal)
     o.add_argument("--dry-run", action="store_true")
     o.set_defaults(func=cmd_roll)
+
+    t = sub.add_parser("items", help="move TICKED items (item-level, [DEC-324]) from a "
+                       "live doc into its archive, under the same ## heading")
+    t.add_argument("--live", default="docs/TODOS.md")
+    t.add_argument("--archive", default="docs/history/TODOS-archive.md")
+    t.add_argument("--stamp", default="")
+    t.add_argument("--dry-run", action="store_true")
+    t.set_defaults(func=cmd_items)
 
     args = p.parse_args()
     sys.exit(args.func(args))
