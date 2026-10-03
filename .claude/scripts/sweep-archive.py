@@ -60,6 +60,7 @@ import argparse
 import collections
 import pathlib
 import re
+import subprocess
 import sys
 
 SESSION_RE = re.compile(r"^## Session Summary \(session (\d+)")
@@ -1030,11 +1031,58 @@ def cmd_items(args):
           "(the citation test is a proxy); nested ticked items (they stay with their parent); "
           "non-checkbox bullets (never moved).", file=sys.stderr)
     if args.dry_run:
+        print("link step skipped: dry-run, the live file was not written")
         return 0
     live_path.write_text("".join(live_after))
     arc_path.write_text("".join(arc_after))
     print(f"wrote {live_path} and {arc_path}")
-    return 0
+    return relink_live(live_path)
+
+
+def relink_live(live_path):
+    """Run link-doc-refs.py on the LIVE file just written ([DEC-076], [DEC-077]).
+
+    WHY. The sweep writes the live file's link block back unchanged, so every
+    definition cited only by the moved items stays behind, dead. With nothing
+    to clean it up, fran-dash's TODOS.md carried 30 of them from 2026-09-29, and
+    the link tool's old count-based guard refused every later run. The tool that
+    creates the leftovers now removes them at once.
+
+    --only the live file: the archive is never relinked here (whether a history
+    file may carry links is still open), and no other in-flight doc is touched.
+
+    ⛔ A link refusal NEVER unwinds the move. The move has already passed the
+    relocation-only check above; the link step works on a file that is correct.
+    It is reported, and the sweep exits 3 -- the link tool's own "refused" code.
+    """
+    tool = pathlib.Path(__file__).resolve().with_name("link-doc-refs.py")
+    docs = None
+    for p in [live_path.resolve().parent, *live_path.resolve().parent.parents]:
+        if (p / "DECISIONS.md").is_file():
+            docs = p
+            break
+        if (p / ".git").exists():
+            break                       # never climb out of the repo
+    if docs is None:
+        print("link step skipped: no DECISIONS.md at or above the live file, so there is no ledger to link against")
+        return 0
+    if not tool.is_file():
+        print(f"⚠️  link step NOT run: {tool.name} is not next to this script. The move is done; "
+              f"run it by hand: python3 <scripts>/link-doc-refs.py {docs} --only {live_path}", file=sys.stderr)
+        return 1
+    r = subprocess.run([sys.executable, str(tool), str(docs), "--only", str(live_path.resolve())],
+                       capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        # The unresolved-ID report covers the whole tree, not this file; noise here.
+        if not line.startswith("unresolved in THIS ledger"):
+            print(f"  [link] {line}")
+    if r.stderr.strip():
+        print(r.stderr.rstrip(), file=sys.stderr)
+    if r.returncode == 3:
+        print(f"⛔ the items WERE moved and both files written; the link step then REFUSED {live_path.name} "
+              f"(see above). The move is not undone. Fix the ledger heading, then re-run "
+              f"link-doc-refs.py --only on the live file.", file=sys.stderr)
+    return r.returncode
 
 
 def main():

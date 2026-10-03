@@ -63,6 +63,11 @@ Usage:
     python3 link-doc-refs.py <docs-dir> --all      # every .md under the directory
     python3 link-doc-refs.py <docs-dir> --dry-run  # report only, write nothing
     python3 link-doc-refs.py <docs-dir> --quiet    # apply, summary only
+    python3 link-doc-refs.py <docs-dir> --only <file>  # just this file (repeatable)
+
+Exit: 0 ok · 1 setup error · 3 a doc was REFUSED (a still-cited link would be lost;
+nothing written to it, every other file still processed). Dead definitions -- IDs
+no longer cited anywhere in the doc -- are dropped and named on stderr, always.
 """
 
 import os
@@ -203,8 +208,65 @@ def rel_href(from_path, docs_dir, target_relpath, slug):
     return f"{rel}#{slug}"
 
 
-# Counts existing link definitions, for the shrink guard in rewrite_doc.
-DEFN_LINE_RE = re.compile(r"^\[[^\]]+\]:\s*\S+", re.M)
+# ── THE COLLECTOR: what counts as a citation ────────────────────────────────────
+# One definition, used twice: to build the definition block, and by the shrink
+# guard to tell a DEAD definition (nothing cites it) from a LOST one (still cited,
+# no longer resolves). Widened 2026-10-03 ([DEC-075]) to three forms the old
+# pattern could not see, each of which Markdown renders as a link:
+#
+#   - `[DEC-381]: reason` MID-LINE. The old lookahead skipped ANY `[ID]` followed
+#     by a colon, because that is how a definition line looks -- but only a
+#     LINE-START `[ID]:` is a definition. Measured in fran-dash: 32 links missing
+#     because their only citation was written "decision X: …".
+#   - a lowercase stand-alone `[dec-8]`. Markdown matches labels case-insensitively.
+#   - a G range's second half, `[G8][g8]`, which range_sub mints and the old
+#     `][dec-NNN]`-only pattern never defined -- a broken link the tool made itself.
+#
+# Labels are kept AS WRITTEN (so existing blocks don't churn); the ID is
+# upper-cased to look up the map, which is keyed canonically ("DEC-8", "G8").
+_ID = r"(?:DEC|M|D)-\d+|G\d+"
+# `[ID]` that is not the second half of a full reference (`]` before it), not an
+# inline link (`(` after) and not the text half of a full reference (`[` after).
+SHORTCUT_RE = re.compile(r"(?<!\])\[(" + _ID + r")\](?![(\[])", re.I)
+# The label half of a full reference: `[text][DEC-3]`, `[6][dec-6]`, `[G8][g8]`.
+FULLREF_RE = re.compile(r"\]\[(" + _ID + r")\]", re.I)
+MANAGED_DEF_RE = re.compile(r"^\[([^\]]+)\]:", re.M)
+
+
+# ── A doc another tool owns ([DEC-078]) ────────────────────────────────────────
+# fran-dash's AREAS_OF_CONCERN.md is written only by tools/concerns/concerns.py,
+# yet this tool rewrote it whenever it was uncommitted. Such a doc carries
+#     <!-- link-doc-refs:skip — written only by <owner> -->
+# and is never rewritten, in any scope. Only a LINE-START marker outside a code
+# fence counts, so a doc that merely mentions the marker is still linked.
+SKIP_MARKER = "<!-- link-doc-refs:skip"
+
+
+def is_owned_elsewhere(path):
+    in_fence = False
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if line.lstrip().startswith("```"):
+                in_fence = not in_fence
+            elif not in_fence and line.startswith(SKIP_MARKER):
+                return True
+    return False
+
+
+def collect_refs(text):
+    """-> [(label_as_written, canonical_id)] for every citation in `text`.
+    Resolvability is NOT checked here -- the caller filters against the map."""
+    out = []
+    for m in SHORTCUT_RE.finditer(text):
+        if text.startswith(":", m.end()):
+            line_start = text.rfind("\n", 0, m.start()) + 1
+            lead = text[line_start:m.start()]
+            if len(lead) <= 3 and lead.strip(" ") == "":
+                continue          # a definition line, not a citation
+        out.append((m.group(1), m.group(1).upper()))
+    for m in FULLREF_RE.finditer(text):
+        out.append((m.group(1), m.group(1).upper()))
+    return out
 
 
 def rewrite_doc(abspath, docs_dir, id_map, dry, self_relpath=None):
@@ -365,16 +427,14 @@ def rewrite_doc(abspath, docs_dir, id_map, dry, self_relpath=None):
     # Collect every reference label actually present in the final text, so the
     # definition block always matches inline usage. Scanning (rather than noting
     # during substitution) is what makes re-runs idempotent: pre-existing
-    # `[DEC-111]` shortcuts are counted too.
+    # `[DEC-111]` shortcuts are counted too. `collect_refs` is ALSO what the
+    # shrink guard below uses to decide whether a dropped ID is still cited, so
+    # the two can never disagree about what counts as a citation.
+    refs = collect_refs(text)
     used = {}
-    for m in re.finditer(r"\[(DEC-\d+|M-\d+|D-\d+|G\d+)\](?![(\[:])", text):
-        rid = m.group(1)
+    for label, rid in refs:
         if rid in id_map:
-            used[rid] = id_map[rid]
-    for m in re.finditer(r"\]\[dec-(\d+)\]", text):
-        rid = f"DEC-{m.group(1)}"
-        if rid in id_map:
-            used[f"dec-{m.group(1)}"] = id_map[rid]
+            used[label] = id_map[rid]
 
     # 4. Append the regenerated definition block (deduped by lowercased label).
     if used:
@@ -396,27 +456,50 @@ def rewrite_doc(abspath, docs_dir, id_map, dry, self_relpath=None):
     if not used and not had_block:
         return False, 0
 
-    # ⛔ GUARD 2 — REFUSE TO SHRINK A MANAGED BLOCK.
+    # ⛔ GUARD 2 — REFUSE TO LOSE A LINK THAT IS STILL CITED.
     #
-    # The general form of Guard 1, and the one that catches causes not yet
-    # invented: whatever the reason, a regenerated block holding FEWER
-    # definitions than the one it replaces is destroying references that a
-    # previous run resolved. That is a defect until a human says otherwise.
-    # Same shape as the append-only guard on docs/history/ ([DEC-260]).
+    # Every definition the regenerated block drops is one of two things:
+    #   DEAD — its ID is no longer cited anywhere in the doc. Dropping it loses
+    #          nothing. Dropped automatically, and NAMED on stderr every time
+    #          (even under --quiet), so a removal can never be silent.
+    #   LOST — its ID is still cited but no longer resolves (a partial ledger
+    #          map, a renamed heading). Dropping it breaks a live link. Refused.
     #
-    # ALLOW_LINK_BLOCK_SHRINK=1 is the loud, deliberate override — correct when
-    # IDs have genuinely been removed from a doc's prose.
-    n_before = len(DEFN_LINE_RE.findall(before))
-    n_after = len(DEFN_LINE_RE.findall(text))
-    if n_after < n_before and not os.environ.get("ALLOW_LINK_BLOCK_SHRINK"):
+    # Changed 2026-10-03 ([DEC-075]). This used to compare only the COUNT of
+    # definitions and refuse any shrink, so it could not tell dead from lost.
+    # After an item sweep left 30 dead definitions in fran-dash's TODOS.md, every
+    # later run was refused -- for four days, and with exit 0, so nobody saw it.
+    # "Still cited" is decided by collect_refs, the same function that builds
+    # the block, so the guard and the block cannot disagree about a citation.
+    #
+    # ALLOW_LINK_BLOCK_SHRINK=1 is the loud, deliberate override for a LOST link.
+    old = BLOCK_RE.search(before)
+    old_labels = {}
+    if old:
+        for m in MANAGED_DEF_RE.finditer(old.group(0)):
+            old_labels.setdefault(m.group(1).lower(), m.group(1))
+    new_keys = {label.lower() for label in used}
+    cited = {rid for _, rid in refs}
+    dropped = [old_labels[k] for k in sorted(old_labels) if k not in new_keys]
+    lost = [lb for lb in dropped if lb.upper() in cited]
+    dead = [lb for lb in dropped if lb.upper() not in cited]
+    rel = os.path.relpath(abspath, docs_dir)
+    if lost and not os.environ.get("ALLOW_LINK_BLOCK_SHRINK"):
         print(
-            f"  ⛔ REFUSED {os.path.relpath(abspath, docs_dir)}: managed block would "
-            f"shrink {n_before} → {n_after} definitions. Nothing written.\n"
-            f"     If the IDs really were removed from the prose, re-run with "
-            f"ALLOW_LINK_BLOCK_SHRINK=1.",
+            f"  ⛔ REFUSED {rel}: {len(lost)} definition(s) are still cited in the prose "
+            f"but no longer resolve: {', '.join(lost)}. Nothing written.\n"
+            f"     Restore the ledger heading(s), or if the loss is deliberate re-run "
+            f"with ALLOW_LINK_BLOCK_SHRINK=1.",
             file=sys.stderr,
         )
         return False, -1
+    verb = "would drop" if dry else "dropped"
+    if dead:
+        print(f"  ✂ {rel}: {verb} {len(dead)} dead definition(s), no longer cited "
+              f"anywhere in the doc: {', '.join(dead)}", file=sys.stderr)
+    if lost:
+        print(f"  ⚠ {rel}: {verb} {len(lost)} STILL-CITED definition(s) under "
+              f"ALLOW_LINK_BLOCK_SHRINK=1: {', '.join(lost)}", file=sys.stderr)
 
     changed = text != before
     if changed and not dry:
@@ -487,8 +570,20 @@ def unresolved_in(docs_dir, ledger_paths, id_map):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    flags = {a for a in sys.argv[1:] if a.startswith("--")}
+    # `--only <file>` takes a value, so it is peeled off before the simple split
+    # into positional args and boolean flags.
+    argv, only = [], []
+    it = iter(sys.argv[1:])
+    for a in it:
+        if a == "--only":
+            v = next(it, None)
+            if v is None:
+                sys.exit("error: --only needs a file path")
+            only.append(os.path.abspath(v))
+        else:
+            argv.append(a)
+    args = [a for a in argv if not a.startswith("--")]
+    flags = {a for a in argv if a.startswith("--")}
     if not args:
         print(__doc__)
         sys.exit(1)
@@ -568,7 +663,16 @@ def main():
     # way; this tool did not, and the checkpoint skill ran them side by side.
     rewrite_set = all_md
     skipped_scope = False
-    if "--all" not in flags:
+    # --only <file> ([DEC-077]): rewrite exactly the named file(s) and nothing
+    # else -- how sweep-archive.py relinks the live file it just edited without
+    # touching the history archive it also wrote. It narrows the REWRITE set only;
+    # the map above was already built from the whole tree (Guard 3's rule).
+    if only:
+        outside = [p for p in only if p not in relpaths]
+        if outside:
+            sys.exit(f"error: --only file(s) not found under {docs_dir!r}: {', '.join(outside)}")
+        rewrite_set = [p for p in all_md if p in set(only)]
+    elif "--all" not in flags:
         changed = git_changed_md(docs_dir)
         if changed is None:
             skipped_scope = True          # not a git work tree — see below
@@ -577,13 +681,19 @@ def main():
             rewrite_set = [p for p in all_md if p in changed]
 
     changed_docs = []
+    refused = []
     for doc in ([] if skipped_scope else rewrite_set):
         if doc in frozen_paths:
+            continue
+        if is_owned_elsewhere(doc):
+            print(f"  skipped (owned by another tool): {os.path.relpath(doc, docs_dir)}", file=sys.stderr)
             continue
         # Self-link mode for the ledger: suppresses links from an entry to itself.
         self_rel = relpaths[doc] if relpaths[doc] == LEDGER else None
         changed, n = rewrite_doc(doc, docs_dir, id_map, dry, self_relpath=self_rel)
-        if changed:
+        if n == -1:
+            refused.append(os.path.relpath(doc, docs_dir))
+        elif changed:
             changed_docs.append((os.path.relpath(doc, docs_dir), n))
 
     # Unresolved reporting stays scoped to docs that merely *reference* IDs. The
@@ -593,7 +703,7 @@ def main():
     missing = unresolved_in(docs_dir, set(target_files), id_map)
 
     tag = "[dry-run] would link" if dry else "linked"
-    scope = "all" if "--all" in flags else "uncommitted"
+    scope = "only" if only else ("all" if "--all" in flags else "uncommitted")
     print(f"ids resolvable: {len(id_map)} (DEC/G/M/D across "
           f"{len(target_files)} ledger/record file(s) — ALWAYS the whole tree)")
     if skipped_scope:
@@ -601,7 +711,7 @@ def main():
               f"Re-run with --all to link every .md under it.")
     print(f"{tag}: {len(changed_docs)} narrative doc(s) "
           f"(scope: {scope} — {len(rewrite_set)} candidate file(s) of {len(all_md)})")
-    if not skipped_scope and "--all" not in flags and not changed_docs:
+    if not skipped_scope and scope == "uncommitted" and not changed_docs:
         print("link-doc-refs: nothing uncommitted to link "
               "(this is the default scope — pass --all to widen it).")
     if not quiet:
@@ -611,6 +721,15 @@ def main():
         items = ", ".join(f"{k}×{v}" for k, v in sorted(missing.items()))
         print(f"unresolved in THIS ledger — left untouched, NOT rewritten "
               f"(they may live in another repo's ledger; check before calling one a typo): {items}")
+
+    # ⛔ A REFUSAL EXITS 3 ([DEC-075]). It used to exit 0, so a caller that
+    # summarized the output saw success: fran-dash's TODOS.md stayed frozen for
+    # four days, and the session that found it had missed it three times. Every
+    # other file is still processed first, so one frozen doc doesn't block the rest.
+    if refused:
+        print(f"⛔ {len(refused)} doc(s) REFUSED, nothing written to them: "
+              f"{', '.join(refused)} — see the REFUSED line(s) above.", file=sys.stderr)
+        sys.exit(3)
 
 
 if __name__ == "__main__":
