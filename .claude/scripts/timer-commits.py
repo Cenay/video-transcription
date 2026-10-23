@@ -16,6 +16,9 @@ REPO SCOPE (ruled 2026-09-24):
   default  -> every git repo under the roots (/mnt/k/Code, /mnt/k/_Sites),
               EXCEPT the personal repos (Code/System) and anything in .archived/.
               claude-personal-toolkit is WORK, never personal.
+              PLUS the work repos that live in Dropbox, outside the roots
+              (EXTRA_REPOS: the A&C exchange and Cenay-shared-ai-training).
+              A missing one is reported, never silently skipped.
   --include-personal  -> also the personal repos.
   --repo NAME         -> only these repo basenames (repeatable).
   A root that does not exist (a teammate's machine) is reported, and the current
@@ -40,6 +43,10 @@ import sys
 from datetime import date, datetime, time, timedelta
 
 ROOTS = ["/mnt/k/Code", "/mnt/k/_Sites"]
+# Work repos outside the roots. Listed one by one rather than walking Dropbox:
+# ~/Dropbox/_Sites holds stale pre-2026 copies of the sites (verified 2026-10-23).
+EXTRA_REPOS = [os.path.expanduser("~/Dropbox/_A&C EXCHANGE"),
+               os.path.expanduser("~/Dropbox/Cenay-shared-ai-training")]
 PERSONAL = {"/mnt/k/Code/System"}
 ROLLOVER_CUTOFF = time(6, 0)
 SKIP_DIRS = {".archived", "node_modules", "vendor", ".git"}
@@ -92,6 +99,20 @@ def find_repos(roots):
     return sorted(repos), missing
 
 
+def add_extras(repos, extras):
+    """Append each extra repo not already found (compared by real path, since
+    Code/TRFA/ac-exchange is a symlink to the exchange). Returns the missing ones."""
+    real = {os.path.realpath(r) for r in repos}
+    missing = []
+    for r in extras:
+        if not os.path.exists(os.path.join(r, ".git")):
+            missing.append(r)
+        elif os.path.realpath(r) not in real:
+            repos.append(r)
+            real.add(os.path.realpath(r))
+    return missing
+
+
 def git(repo, *args):
     r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
     return r.stdout if r.returncode == 0 else None
@@ -104,6 +125,8 @@ def main(argv):
     ap.add_argument("--repo", action="append", default=[], help="limit to these repo basenames")
     ap.add_argument("--now", help="override the current time (testing): 'YYYY-MM-DD HH:MM'")
     ap.add_argument("--roots", nargs="+", default=ROOTS)
+    ap.add_argument("--extra-repos", nargs="*", default=EXTRA_REPOS,
+                    help="repos outside the roots (default: the Dropbox work repos); pass none to skip")
     a = ap.parse_args(argv)
 
     now = datetime.strptime(a.now, "%Y-%m-%d %H:%M") if a.now else datetime.now().replace(microsecond=0)
@@ -119,9 +142,12 @@ def main(argv):
     start, end, rolled = window(d1, d2, now)
 
     repos, missing = find_repos(a.roots)
+    extras_missing = add_extras(repos, a.extra_repos)
     notes = []
     if missing:
         notes.append(f"roots not found, NOT searched: {', '.join(missing)}")
+    if extras_missing:
+        notes.append(f"extra repos not found, NOT searched: {', '.join(extras_missing)}")
     if not repos:
         top = git(os.getcwd(), "rev-parse", "--show-toplevel")
         if top:
