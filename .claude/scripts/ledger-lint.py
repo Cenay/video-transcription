@@ -13,7 +13,7 @@ the generator could not parse the file, and the only reason anyone knew the
 counts were right was that someone recounted them by hand and said so in a
 warning above the table.
 
-The nine checks below are what make the round trip trustworthy rather than
+The ten checks below are what make the round trip trustworthy rather than
 hoped-for. They are cheap; run this before finishing any session that touched
 the ledger.
 
@@ -22,7 +22,9 @@ READABLE: every entry ends with a plain-English restatement that costs the
 reader no lookups (the same rule as the Session Desk's rule 14, with its grammar
 imported rather than restated). Check 9 is about it being UNIFORM: every entry
 is written in the one shape ruled 2026-08-20, emitted by write-entry.py from the
-same spec this check reads.
+same spec this check reads. Check 10 is about it being in ONE PIECE: no section
+sits between the numbered entries, because write-entry.py appends after the
+last entry and anything wedged into the run drags every later entry under it.
 
 DESIGN NOTE. Every check reports the specific offending IDs or paths, never just
 a count. "3 anchors are broken" sends you hunting; naming them does not. This
@@ -544,6 +546,59 @@ def check_tldr(r, lines, entries):
     return len(missing)
 
 
+def check_contiguous(r, lines, entries):
+    """Check 10 — the numbered entries stay together, with no section between them.
+
+    THE DEFECT, measured 2026-11-07 in fran-dash. On 2026-08-05 a hand-placed
+    entry went in at the very END of the file, below the "Chronological record"
+    and "Footer" sections, instead of after the entry before it. write-entry.py
+    appends after the last entry, so every entry for the next three months
+    followed it: 319 decisions sat under "## Footer — closed G items", and
+    PhpStorm's Structure pane appeared to stop at DEC-185. No check looked at
+    which section an entry sits in, so nothing flagged it.
+
+    THE RULE. Between the first and the last entry of the ledger's main family
+    (the most common ID prefix, `DEC-` in practice), no heading may appear at an
+    entry's level or shallower unless it is itself an entry. Deeper headings are
+    an entry's own sub-sections and are fine; fenced code is skipped.
+
+    WHY THE MAIN FAMILY AND NOT EVERY ENTRY. A ledger may park an odd entry of
+    another family outside the numbered run — fran-dash keeps G77, a met launch
+    gate, just below the index, by Cenay's ruling of 2026-11-07. Counting from
+    the first entry of any kind would flag the "# Decisions" heading beneath it.
+
+    NOT CHECKED: whether the run sits under the right heading, or whether the
+    entries are in numeric order. Only that nothing interrupts the run.
+    """
+    name = "10 the numbered entries stay together"
+    fams = {}
+    for e in entries:
+        fams.setdefault(re.match(r"[A-Z]+", e.id).group(0), []).append(e)
+    fam, run = max(fams.items(), key=lambda kv: len(kv[1]))
+    if len(run) < 2:
+        r.ok(name, "fewer than two entries in the main family — nothing to check")
+        return
+    first = min(e.line for e in run)
+    last = max(e.line for e in run)
+    level = min(e.level for e in run)
+    entry_lines = {e.line for e in entries}
+    fences = fenced_lines(lines)
+    heading = re.compile(r"^(#{1,6})\s")
+    found = []
+    for i in range(first, last - 1):          # 0-based indexes strictly between the two
+        if i in fences or (i + 1) in entry_lines:
+            continue
+        m = heading.match(lines[i])
+        if m and len(m.group(1)) <= level:
+            found.append(f"line {i + 1}: {lines[i].strip()[:80]}")
+    if found:
+        r.fail(name, f"{len(found)} section heading(s) inside the run of {fam}- entries "
+                     f"— move them below the last entry, or new entries will be appended "
+                     f"under them", found)
+    else:
+        r.ok(name, f"{len(run)} {fam}- entries, nothing between them")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -778,6 +833,9 @@ def main():
 
     # 9 — every entry is written in the one canonical shape (see check_shape).
     outstanding += check_shape(r, lines, entries)
+
+    # 10 — nothing sits in the middle of the numbered run (see check_contiguous).
+    check_contiguous(r, lines, entries)
 
     # The adopting marker is SHARED by checks 8 and 9, so whether it has outlived
     # its purpose can only be judged after both have run. ⚠️ Judging it inside
