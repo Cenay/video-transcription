@@ -16,6 +16,19 @@ set -uo pipefail
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
+# Per-repo opt-out. A repo that has the file `.claude/skip-status-doc-hook` is
+# never warned. Ruled 2026-11-10 by Cenay for the two exchange repos (the A&C
+# Exchange with Art, and the KC Exchange with Khurram): "There is no code in
+# this other than code used to implement the exchange. This isn't code used in
+# a repo on a real project." Their commits are exchange items and rules, not
+# project work a status doc has to account for.
+# ⚠️ The marker is a FILE IN THE REPO, not a path list in this script: it is
+# committed, so it travels to every clone, and the repo itself says why it
+# opted out (put the reason in the file). It must be exactly this name in
+# exactly this place — test 7 in test-status-doc-hook.py proves a near miss
+# does not silence the hook.
+[ -f ".claude/skip-status-doc-hook" ] && exit 0
+
 SID="${CLAUDE_SESSION_ID:-unknown}"
 BASE_FILE="$(git rev-parse --git-dir)/claude-session-head-${SID}"
 FIRED_FILE="$(git rev-parse --git-dir)/claude-status-warned-${SID}"

@@ -1,6 +1,6 @@
 # Managed-file hashes written by sync-shared.sh — do not edit.
 # Drift = a file here no longer matches its recorded hash.
-# Last synced: 2026-11-07 04:02 MST
+# Last synced: 2026-11-18 00:50 MST
 e1fad792a169d0789d2b166a7d14cbab22a6adfbece64adb4b17f9b330951a68  .claude/skills/wrap-up/guides/WRAP_UP_GUIDE.md
 c0e61ad160d419f0190134863f84a1cbbe655886d2ab828f1d4f508986a2a0ad  .claude/skills/wrap-up/SKILL.md
 ab6dafc437cf44a3879f84fb94eaa4b6ffc3fc758cd82bcec668942e92be5f09  .claude/skills/next-step/SKILL.md
@@ -22,7 +22,7 @@ a144276abb5f59f48453da268fac66924f2078b99621d7f9ea88353cb10e9f0a  .claude/script
 00f607170441cc4e815d5f57eb1a3915c89adcb4423487488e7b2dc3708f32fd  .claude/scripts/check-append-only.py
 37ba8ed91739a4655e80905b9ae2362e0a9772bdf48c0464642235bb69fcadcd  .claude/scripts/check-ledger-lint.py
 da10a81d0775284bb93a16a1fb26d8c3fb9a96b89cf22f5fb1c546628b8fb7fe  .claude/scripts/sweep-archive.py
-c50b5c0e387b68793a17d7c437a62b8e9ed697bed1e23dbf761458e137fed8d1  .claude/scripts/check-status-doc-updated.sh
+6b7d943480126184629ffcdca6ecb6ab162b6d8ff96d4378ad2b4e1182c9296f  .claude/scripts/check-status-doc-updated.sh
 0791ece3e15911648f3e8db582e4f1ae3ab017d570c577ed04e3771d86f292ab  .claude/scripts/doc_root.py
 b485dfa0921abcc032fc04aec1e82bde4e8637ed86def76c104eea66bfb87d7e  .github/ISSUE_TEMPLATE/bug_report.yml
 4b5a0f7a5fbd0182f52030e9589a385533c906d0948c268be76efa433807923b  .github/ISSUE_TEMPLATE/config.yml
